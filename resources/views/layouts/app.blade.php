@@ -9,7 +9,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-slate-100/80 font-sans antialiased text-slate-800" x-data="{ sidebarOpen: true }">
+<body class="bg-slate-100/80 font-sans antialiased text-slate-800" x-data="{ sidebarOpen: window.innerWidth >= 1024 }">
 
     <div class="min-h-screen flex flex-col">
         <!-- Header Atas (Sekarang Sudah Dipasang) -->
@@ -20,7 +20,7 @@
             @include('layouts.partials.sidebar')
 
             <!-- Main Content Area -->
-            <main :class="sidebarOpen ? 'ml-64' : 'ml-0'" class="flex-1 p-8 transition-all duration-300">
+            <main :class="sidebarOpen ? 'ml-64' : 'ml-0'" class="min-w-0 flex-1 p-4 lg:p-8 transition-all duration-300">
                 @yield('content')
             </main>
         </div>

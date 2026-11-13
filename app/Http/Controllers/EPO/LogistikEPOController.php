@@ -62,7 +62,7 @@ class LogistikEPOController extends Controller
 
     public function detailForecast($id)
     {
-        return view('pages.e-po.logistik.detail', [
+        return view('pages.e-po.logistik.detail-forecast', [
             'id' => $id,
             'distributor' => $this->getDistributorData(),
             'pabrik' => $this->getPabrikData(),
@@ -73,7 +73,7 @@ class LogistikEPOController extends Controller
 
     public function tetapkanKuota(Request $request, $id)
     {
-        return redirect()->route('pages.e-po.logistik.antrean')
+        return redirect()->route('e-po.logistik.antrean')
             ->with('success', 'Kuota berhasil ditetapkan & notifikasi dikirim ke distributor.');
     }
 
@@ -101,7 +101,7 @@ class LogistikEPOController extends Controller
 
     public function setujuiEpo(Request $request, $id)
     {
-        return redirect()->route('pages.e-po.logistik.antrean')
+        return redirect()->route('e-po.logistik.antrean')
             ->with('success', 'E-PO disetujui dan dokumen PO resmi berkode SAP diterbitkan.');
     }
 }

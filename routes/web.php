@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminPortalController;
 use App\Http\Controllers\EPO\DistributorEPOController;
 use App\Http\Controllers\EPO\LogistikEPOController;
+use App\Http\Controllers\PelaporanController;
 use Illuminate\Support\Facades\Route;
 
 // Redirect otomatis dari http://localhost:8000/ ke E-PO Distributor
@@ -10,7 +11,7 @@ Route::get('/', function () {
     return redirect()->route('e-po.distributor.hitung-forecast');
 });
 
-// Route utama simulasi aktor 
+// Route utama simulasi aktor
 Route::get('/distributor', [DistributorEPOController::class, 'hitungForecast'])
     ->defaults('role', 'distributor')
     ->name('simulation.distributor');
@@ -27,7 +28,9 @@ Route::get('/sam', function () {
     ]);
 })->defaults('role', 'sam')->name('simulation.sam');
 
-Route::get('/admin', function () {
+Route::get('/simulasi/admin', function () {
+    session(['mock_role' => 'admin']);
+
     return redirect()->route('admin.ringkasan');
 })->defaults('role', 'admin')->name('simulation.admin');
 
@@ -76,11 +79,14 @@ Route::get('/klaim', function () {
 })->name('klaim.index');
 
 // Route Sementara Modul Pelaporan (PJ: Hasbi)
-Route::get('/pelaporan', function () {
-    return view('pages.pelaporan.index');
-})->name('pelaporan.index');
+Route::get('/pelaporan', [PelaporanController::class, 'index'])->name('pelaporan.index');
+Route::get('/pelaporan/ekspor', [PelaporanController::class, 'export'])->name('pelaporan.export');
+Route::post('/pelaporan/konteks', [PelaporanController::class, 'context'])->name('pelaporan.context');
+Route::post('/pelaporan/sell-out', [PelaporanController::class, 'storeSellOut'])->name('pelaporan.sell-out.store');
+Route::post('/pelaporan/stok', [PelaporanController::class, 'storeStock'])->name('pelaporan.stok.store');
+Route::get('/integrasi-database/status', [PelaporanController::class, 'databaseStatus'])->name('database.status');
 
 // Route Master Data Admin (Redirect ke Portal Admin)
 Route::get('/master-data', function () {
     return redirect()->route('admin.ringkasan');
-})->name('admin.index');
+})->name('master-data.index');

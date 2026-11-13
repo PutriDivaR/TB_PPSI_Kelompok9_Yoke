@@ -1,0 +1,1738 @@
+{
+  "tables": [
+    {
+      "class": "Pengguna",
+      "name": "pengguna",
+      "attrs": [
+        {
+          "name": "id_pengguna",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "nama",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(150)",
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": true,
+          "type": "VARCHAR(254)",
+          "nullable": false
+        },
+        {
+          "name": "kata_sandi",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(255)",
+          "nullable": false
+        },
+        {
+          "name": "id_peran",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "peran",
+            "child": "pengguna",
+            "fk": "id_peran",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "status_aktif",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "BOOLEAN",
+          "nullable": true
+        },
+        {
+          "name": "id_distributor",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "distributor",
+            "child": "pengguna",
+            "fk": "id_distributor",
+            "max": "1",
+            "parentOptional": true
+          },
+          "unique": true,
+          "w": false,
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 1"
+    },
+    {
+      "class": "Peran",
+      "name": "peran",
+      "attrs": [
+        {
+          "name": "id_peran",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "nama_peran",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(150)",
+          "nullable": false
+        },
+        {
+          "name": "deskripsi",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "TEXT",
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 1"
+    },
+    {
+      "class": "Distributor",
+      "name": "distributor",
+      "attrs": [
+        {
+          "name": "id_distributor",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "nama",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(150)",
+          "nullable": false
+        },
+        {
+          "name": "id_wilayah",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "wilayah",
+            "child": "distributor",
+            "fk": "id_wilayah",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "kontak",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(60)",
+          "nullable": false
+        },
+        {
+          "name": "alamat_gudang",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "nomor_mou",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(60)",
+          "nullable": true
+        },
+        {
+          "name": "status_aktif",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "BOOLEAN",
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 2"
+    },
+    {
+      "class": "Wilayah",
+      "name": "wilayah",
+      "attrs": [
+        {
+          "name": "id_wilayah",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "nama_wilayah",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(150)",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 2"
+    },
+    {
+      "class": "Produk",
+      "name": "produk",
+      "attrs": [
+        {
+          "name": "id_produk",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "kode_sku",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": true,
+          "type": "VARCHAR(60)",
+          "nullable": false
+        },
+        {
+          "name": "nama_produk",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(150)",
+          "nullable": false
+        },
+        {
+          "name": "harga",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DECIMAL(15,2)",
+          "nullable": false
+        },
+        {
+          "name": "karton_per_kontainer",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        },
+        {
+          "name": "kategori",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 3"
+    },
+    {
+      "class": "TahunFiskal",
+      "name": "tahun_fiskal",
+      "attrs": [
+        {
+          "name": "id_tahun_fiskal",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_mulai",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_selesai",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 4"
+    },
+    {
+      "class": "LogAktivitas",
+      "name": "log_aktivitas",
+      "attrs": [
+        {
+          "name": "id_log",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_pengguna",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "pengguna",
+            "child": "log_aktivitas",
+            "fk": "id_pengguna",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "modul",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(60)",
+          "nullable": false
+        },
+        {
+          "name": "aksi",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(60)",
+          "nullable": false
+        },
+        {
+          "name": "waktu",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 5"
+    },
+    {
+      "class": "Forecast",
+      "name": "forecast",
+      "attrs": [
+        {
+          "name": "id_forecast",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_distributor",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "distributor",
+            "child": "forecast",
+            "fk": "id_distributor",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_tahun_fiskal",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "tahun_fiskal",
+            "child": "forecast",
+            "fk": "id_tahun_fiskal",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "periode",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_pengajuan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_disetujui",
+          "type": "DATETIME",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": true
+        },
+        {
+          "name": "id_penyetuju",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "pengguna",
+            "child": "forecast",
+            "fk": "id_penyetuju",
+            "max": "N",
+            "parentOptional": true
+          },
+          "unique": false,
+          "w": false,
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 6, SKF 7"
+    },
+    {
+      "class": "DetailForecast",
+      "name": "detail_forecast",
+      "attrs": [
+        {
+          "name": "id_detail_forecast",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_forecast",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "forecast",
+            "child": "detail_forecast",
+            "fk": "id_forecast",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_produk",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "produk",
+            "child": "detail_forecast",
+            "fk": "id_produk",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "jumlah_kontainer",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        },
+        {
+          "name": "jumlah_disetujui",
+          "type": "INT",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 6"
+    },
+    {
+      "class": "PurchaseOrder",
+      "name": "purchase_order",
+      "attrs": [
+        {
+          "name": "id_po",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "nomor_po",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": true,
+          "type": "VARCHAR(60)",
+          "nullable": false
+        },
+        {
+          "name": "id_forecast",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "forecast",
+            "child": "purchase_order",
+            "fk": "id_forecast",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "tanggal_pengajuan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_disetujui",
+          "type": "DATETIME",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": true
+        },
+        {
+          "name": "id_penyetuju",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "pengguna",
+            "child": "purchase_order",
+            "fk": "id_penyetuju",
+            "max": "N",
+            "parentOptional": true
+          },
+          "unique": false,
+          "w": false,
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 8, SKF 10, SKF 11"
+    },
+    {
+      "class": "DetailPO",
+      "name": "detail_po",
+      "attrs": [
+        {
+          "name": "id_detail_po",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_po",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "purchase_order",
+            "child": "detail_po",
+            "fk": "id_po",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_produk",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "produk",
+            "child": "detail_po",
+            "fk": "id_produk",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "jumlah_kontainer",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 8, SKF 9"
+    },
+    {
+      "class": "Pengiriman",
+      "name": "pengiriman",
+      "attrs": [
+        {
+          "name": "id_pengiriman",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_po",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "purchase_order",
+            "child": "pengiriman",
+            "fk": "id_po",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "nomor_kontainer",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(60)",
+          "nullable": false
+        },
+        {
+          "name": "nama_vessel",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(150)",
+          "nullable": true
+        },
+        {
+          "name": "eta_awal",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        },
+        {
+          "name": "eta_terkini",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 12, SKF 13, SKF 14"
+    },
+    {
+      "class": "MilestonePengiriman",
+      "name": "milestone_pengiriman",
+      "attrs": [
+        {
+          "name": "id_milestone",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_pengiriman",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "pengiriman",
+            "child": "milestone_pengiriman",
+            "fk": "id_pengiriman",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "urutan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        },
+        {
+          "name": "nama_tahap",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(150)",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_pembaruan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        },
+        {
+          "name": "keterangan",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "TEXT",
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 12"
+    },
+    {
+      "class": "PenerimaanBarang",
+      "name": "penerimaan_barang",
+      "attrs": [
+        {
+          "name": "id_penerimaan",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_pengiriman",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "pengiriman",
+            "child": "penerimaan_barang",
+            "fk": "id_pengiriman",
+            "max": "1"
+          },
+          "unique": true,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_terima",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 15"
+    },
+    {
+      "class": "Klaim",
+      "name": "klaim",
+      "attrs": [
+        {
+          "name": "id_klaim",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_penerimaan",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "penerimaan_barang",
+            "child": "klaim",
+            "fk": "id_penerimaan",
+            "max": "1"
+          },
+          "unique": true,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_pengajuan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_penyelesaian",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": true
+        }
+      ],
+      "skf": "SKF 16, SKF 17, SKF 19"
+    },
+    {
+      "class": "FotoBukti",
+      "name": "foto_bukti",
+      "attrs": [
+        {
+          "name": "id_foto",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_detail_klaim",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "detail_klaim",
+            "child": "foto_bukti",
+            "fk": "id_detail_klaim",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "path_berkas",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(255)",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_unggah",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 16"
+    },
+    {
+      "class": "BeritaAcaraKerusakan",
+      "name": "berita_acara_kerusakan",
+      "attrs": [
+        {
+          "name": "id_bak",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_klaim",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "klaim",
+            "child": "berita_acara_kerusakan",
+            "fk": "id_klaim",
+            "max": "1"
+          },
+          "unique": true,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "nomor_bak",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": true,
+          "type": "VARCHAR(60)",
+          "nullable": false
+        },
+        {
+          "name": "id_pengesah",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "pengguna",
+            "child": "berita_acara_kerusakan",
+            "fk": "id_pengesah",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "tanggal_pengesahan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATETIME",
+          "nullable": false
+        },
+        {
+          "name": "tanda_tangan_digital",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(255)",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 18, SKF 19"
+    },
+    {
+      "class": "SellIn",
+      "name": "sell_in",
+      "attrs": [
+        {
+          "name": "id_sell_in",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_detail_pengiriman",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "detail_pengiriman",
+            "child": "sell_in",
+            "fk": "id_detail_pengiriman",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "nomor_invoice",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(60)",
+          "nullable": true
+        },
+        {
+          "name": "nomor_do",
+          "w": true,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(60)",
+          "nullable": true
+        },
+        {
+          "name": "jumlah",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        },
+        {
+          "name": "tanggal",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 21"
+    },
+    {
+      "class": "SellOut",
+      "name": "sell_out",
+      "attrs": [
+        {
+          "name": "id_sell_out",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_distributor",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "distributor",
+            "child": "sell_out",
+            "fk": "id_distributor",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_produk",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "produk",
+            "child": "sell_out",
+            "fk": "id_produk",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "kanal",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        },
+        {
+          "name": "jumlah",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        },
+        {
+          "name": "tanggal",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 20"
+    },
+    {
+      "class": "StokGudang",
+      "name": "stok_gudang",
+      "attrs": [
+        {
+          "name": "id_stok",
+          "w": false,
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_distributor",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "distributor",
+            "child": "stok_gudang",
+            "fk": "id_distributor",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "id_produk",
+          "w": false,
+          "pk": false,
+          "fk": {
+            "parent": "produk",
+            "child": "stok_gudang",
+            "fk": "id_produk",
+            "max": "N"
+          },
+          "unique": false,
+          "type": "BIGINT",
+          "nullable": false
+        },
+        {
+          "name": "periode",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": false
+        },
+        {
+          "name": "stok_fisik",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        },
+        {
+          "name": "stok_layak_jual",
+          "type": "INT",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        }
+      ],
+      "skf": "SKF 20, SKF 21"
+    },
+    {
+      "name": "detail_pengiriman",
+      "class": "DetailPengiriman",
+      "attrs": [
+        {
+          "name": "id_detail_pengiriman",
+          "type": "BIGINT",
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "id_pengiriman",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "pengiriman",
+            "child": "detail_pengiriman",
+            "fk": "id_pengiriman",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "id_detail_po",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "detail_po",
+            "child": "detail_pengiriman",
+            "fk": "id_detail_po",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "jumlah_dikirim",
+          "type": "INT",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        }
+      ],
+      "skf": "Rancangan berdasarkan review transkrip"
+    },
+    {
+      "name": "detail_penerimaan",
+      "class": "DetailPenerimaan",
+      "attrs": [
+        {
+          "name": "id_detail_penerimaan",
+          "type": "BIGINT",
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "id_penerimaan",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "penerimaan_barang",
+            "child": "detail_penerimaan",
+            "fk": "id_penerimaan",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "id_detail_pengiriman",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "detail_pengiriman",
+            "child": "detail_penerimaan",
+            "fk": "id_detail_pengiriman",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "jumlah_diterima",
+          "type": "INT",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "jumlah_baik",
+          "type": "INT",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "kondisi",
+          "type": "VARCHAR(40)",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        }
+      ],
+      "skf": "Rancangan berdasarkan review transkrip"
+    },
+    {
+      "name": "detail_klaim",
+      "class": "DetailKlaim",
+      "attrs": [
+        {
+          "name": "id_detail_klaim",
+          "type": "BIGINT",
+          "pk": true,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "id_klaim",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "klaim",
+            "child": "detail_klaim",
+            "fk": "id_klaim",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "id_detail_penerimaan",
+          "type": "BIGINT",
+          "pk": false,
+          "fk": {
+            "parent": "detail_penerimaan",
+            "child": "detail_klaim",
+            "fk": "id_detail_penerimaan",
+            "max": "N"
+          },
+          "unique": false,
+          "w": false,
+          "nullable": false
+        },
+        {
+          "name": "jenis_kerusakan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        },
+        {
+          "name": "jumlah",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": false
+        },
+        {
+          "name": "penanggung_jawab",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": false
+        },
+        {
+          "name": "status_verifikasi",
+          "type": "VARCHAR(40)",
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "w": false,
+          "nullable": false
+        }
+      ],
+      "skf": "Rancangan berdasarkan review transkrip"
+    }
+  ],
+  "edges": [
+    {
+      "parent": "peran",
+      "child": "pengguna",
+      "fk": "id_peran",
+      "max": "N"
+    },
+    {
+      "parent": "wilayah",
+      "child": "distributor",
+      "fk": "id_wilayah",
+      "max": "N"
+    },
+    {
+      "parent": "pengguna",
+      "child": "log_aktivitas",
+      "fk": "id_pengguna",
+      "max": "N"
+    },
+    {
+      "parent": "distributor",
+      "child": "forecast",
+      "fk": "id_distributor",
+      "max": "N"
+    },
+    {
+      "parent": "tahun_fiskal",
+      "child": "forecast",
+      "fk": "id_tahun_fiskal",
+      "max": "N"
+    },
+    {
+      "parent": "forecast",
+      "child": "detail_forecast",
+      "fk": "id_forecast",
+      "max": "N"
+    },
+    {
+      "parent": "produk",
+      "child": "detail_forecast",
+      "fk": "id_produk",
+      "max": "N"
+    },
+    {
+      "parent": "purchase_order",
+      "child": "detail_po",
+      "fk": "id_po",
+      "max": "N"
+    },
+    {
+      "parent": "produk",
+      "child": "detail_po",
+      "fk": "id_produk",
+      "max": "N"
+    },
+    {
+      "parent": "purchase_order",
+      "child": "pengiriman",
+      "fk": "id_po",
+      "max": "N"
+    },
+    {
+      "parent": "pengiriman",
+      "child": "milestone_pengiriman",
+      "fk": "id_pengiriman",
+      "max": "N"
+    },
+    {
+      "parent": "pengiriman",
+      "child": "penerimaan_barang",
+      "fk": "id_pengiriman",
+      "max": "1"
+    },
+    {
+      "parent": "penerimaan_barang",
+      "child": "klaim",
+      "fk": "id_penerimaan",
+      "max": "1"
+    },
+    {
+      "parent": "klaim",
+      "child": "berita_acara_kerusakan",
+      "fk": "id_klaim",
+      "max": "1"
+    },
+    {
+      "parent": "pengguna",
+      "child": "berita_acara_kerusakan",
+      "fk": "id_pengesah",
+      "max": "N"
+    },
+    {
+      "parent": "distributor",
+      "child": "sell_out",
+      "fk": "id_distributor",
+      "max": "N"
+    },
+    {
+      "parent": "produk",
+      "child": "sell_out",
+      "fk": "id_produk",
+      "max": "N"
+    },
+    {
+      "parent": "distributor",
+      "child": "stok_gudang",
+      "fk": "id_distributor",
+      "max": "N"
+    },
+    {
+      "parent": "produk",
+      "child": "stok_gudang",
+      "fk": "id_produk",
+      "max": "N"
+    },
+    {
+      "parent": "pengiriman",
+      "child": "detail_pengiriman",
+      "fk": "id_pengiriman",
+      "max": "N"
+    },
+    {
+      "parent": "detail_po",
+      "child": "detail_pengiriman",
+      "fk": "id_detail_po",
+      "max": "N"
+    },
+    {
+      "parent": "penerimaan_barang",
+      "child": "detail_penerimaan",
+      "fk": "id_penerimaan",
+      "max": "N"
+    },
+    {
+      "parent": "detail_pengiriman",
+      "child": "detail_penerimaan",
+      "fk": "id_detail_pengiriman",
+      "max": "N"
+    },
+    {
+      "parent": "klaim",
+      "child": "detail_klaim",
+      "fk": "id_klaim",
+      "max": "N"
+    },
+    {
+      "parent": "detail_penerimaan",
+      "child": "detail_klaim",
+      "fk": "id_detail_penerimaan",
+      "max": "N"
+    },
+    {
+      "parent": "detail_klaim",
+      "child": "foto_bukti",
+      "fk": "id_detail_klaim",
+      "max": "N"
+    },
+    {
+      "parent": "detail_pengiriman",
+      "child": "sell_in",
+      "fk": "id_detail_pengiriman",
+      "max": "N"
+    },
+    {
+      "parent": "forecast",
+      "child": "purchase_order",
+      "fk": "id_forecast",
+      "max": "N"
+    },
+    {
+      "parent": "pengguna",
+      "child": "forecast",
+      "fk": "id_penyetuju",
+      "max": "N",
+      "parentOptional": true
+    },
+    {
+      "parent": "pengguna",
+      "child": "purchase_order",
+      "fk": "id_penyetuju",
+      "max": "N",
+      "parentOptional": true
+    },
+    {
+      "parent": "distributor",
+      "child": "pengguna",
+      "fk": "id_distributor",
+      "max": "1",
+      "parentOptional": true
+    }
+  ],
+  "groups": [
+    [
+      "Pengelolaan Master Data",
+      [
+        "pengguna",
+        "peran",
+        "distributor",
+        "wilayah",
+        "produk",
+        "tahun_fiskal",
+        "log_aktivitas"
+      ]
+    ],
+    [
+      "E-PO dan Forecasting",
+      [
+        "forecast",
+        "detail_forecast",
+        "purchase_order",
+        "detail_po"
+      ]
+    ],
+    [
+      "Monitoring Pengiriman",
+      [
+        "pengiriman",
+        "milestone_pengiriman",
+        "penerimaan_barang",
+        "detail_pengiriman",
+        "detail_penerimaan"
+      ]
+    ],
+    [
+      "Manajemen Klaim dan Retur",
+      [
+        "klaim",
+        "foto_bukti",
+        "berita_acara_kerusakan",
+        "detail_klaim"
+      ]
+    ],
+    [
+      "Pelaporan dan Monitoring Stok",
+      [
+        "sell_in",
+        "sell_out",
+        "stok_gudang"
+      ]
+    ]
+  ],
+  "unique": {
+    "pengguna": [
+      "email",
+      "id_distributor"
+    ],
+    "produk": [
+      "kode_sku"
+    ],
+    "purchase_order": [
+      "nomor_po"
+    ],
+    "berita_acara_kerusakan": [
+      "nomor_bak",
+      "id_klaim"
+    ],
+    "penerimaan_barang": [
+      "id_pengiriman"
+    ],
+    "klaim": [
+      "id_penerimaan"
+    ]
+  },
+  "multi_unique": {
+    "detail_forecast": [
+      "id_forecast",
+      "id_produk"
+    ],
+    "detail_po": [
+      "id_po",
+      "id_produk"
+    ],
+    "stok_gudang": [
+      "id_distributor",
+      "id_produk",
+      "periode"
+    ],
+    "detail_pengiriman": [
+      "id_pengiriman",
+      "id_detail_po"
+    ],
+    "detail_penerimaan": [
+      "id_penerimaan",
+      "id_detail_pengiriman"
+    ],
+    "forecast": [
+      "id_distributor",
+      "periode"
+    ]
+  }
+}

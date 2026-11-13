@@ -125,6 +125,14 @@
             </div>
             @endif
 
+            @if(in_array($currentRole, ['distributor', 'logistik', 'sam', 'admin']))
+            <div>
+                <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Laporan</div>
+                <a href="{{ route('pelaporan.index') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('pelaporan.*') ? 'bg-slate-800 text-white border-l-4 border-red-500' : '' }}">
+                    <i class="fa-solid fa-chart-column w-4"></i><span>Pelaporan & Stok (MySQL)</span>
+                </a>
+            </div>
+            @endif
         </nav>
     </div>
 

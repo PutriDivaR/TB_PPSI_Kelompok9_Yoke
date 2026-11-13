@@ -107,7 +107,7 @@ class DistributorEPOController extends Controller
             }
         }
 
-        return redirect()->route('pages.e-po.distributor.epo-selesai');
+        return redirect()->route('e-po.distributor.epo-selesai');
     }
 
     public function epoSelesai()

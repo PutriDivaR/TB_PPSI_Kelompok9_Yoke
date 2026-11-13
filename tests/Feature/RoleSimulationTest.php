@@ -33,12 +33,14 @@ class RoleSimulationTest extends TestCase
             ->assertSessionHas('mock_role', 'sam');
     }
 
-    public function test_admin_simulation_renders_a_placeholder_page(): void
+    public function test_admin_simulation_opens_the_admin_portal(): void
     {
-        $response = $this->get('/admin');
-
-        $response->assertOk()
-            ->assertSee('Administrator')
+        $this->get('/simulasi/admin')
+            ->assertRedirect(route('admin.ringkasan'))
             ->assertSessionHas('mock_role', 'admin');
+
+        $this->get('/admin/ringkasan')
+            ->assertOk()
+            ->assertSee('Portal Admin');
     }
 }

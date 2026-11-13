@@ -16,13 +16,14 @@
 <header :class="sidebarOpen ? 'left-64' : 'left-0'" 
         class="bg-white border-b border-slate-200 h-16 fixed top-0 right-0 z-30 flex items-center justify-between px-6 transition-all duration-300">
     
+    <button type="button" @click="sidebarOpen = !sidebarOpen" class="mr-3 rounded-lg border border-slate-200 p-2 text-slate-600" aria-label="Buka atau tutup menu"><i class="fa-solid fa-bars"></i></button>
     <!-- Left: Breadcrumbs -->
-    <div class="flex items-center space-x-3 text-xs font-medium text-slate-500">
+    <div class="hidden min-w-0 flex-1 items-center space-x-3 text-xs font-medium text-slate-500 lg:flex">
         <span class="text-slate-400">WAYPOINT</span>
         <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
         <span class="text-slate-700 font-bold uppercase tracking-wider">{{ $currentRole }}</span>
         <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
-        <span class="text-red-600 font-bold">Modul E-PO & Forecasting</span>
+        <span class="text-red-600 font-bold">@yield('module_title', 'Modul E-PO & Forecasting')</span>
     </div>
 
     <!-- Right: Simulator Role Switcher Dropdown & User Profile -->
