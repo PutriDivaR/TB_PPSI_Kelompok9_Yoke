@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminPortalController;
 use App\Http\Controllers\EPO\DistributorEPOController;
 use App\Http\Controllers\EPO\LogistikEPOController;
 use Illuminate\Support\Facades\Route;
@@ -27,12 +28,21 @@ Route::get('/sam', function () {
 })->defaults('role', 'sam')->name('simulation.sam');
 
 Route::get('/admin', function () {
-    return view('pages.role-placeholder', [
-        'role' => 'admin',
-        'title' => 'Administrator',
-        'description' => 'Halaman simulasi untuk pengelolaan pengguna dan master data.',
-    ]);
+    return redirect()->route('admin.ringkasan');
 })->defaults('role', 'admin')->name('simulation.admin');
+
+// ==================== PORTAL ADMIN (Sesuai Dokumen & Mockup) ====================
+Route::prefix('admin')->name('admin.')->controller(AdminPortalController::class)->group(function () {
+    Route::get('/', function () {
+        return redirect()->route('admin.ringkasan');
+    })->name('index');
+    Route::get('/ringkasan', 'ringkasan')->name('ringkasan');
+    Route::get('/pengguna', 'pengguna')->name('pengguna');
+    Route::get('/distributor', 'distributor')->name('distributor');
+    Route::get('/produk', 'produk')->name('produk');
+    Route::get('/tahun-fiskal', 'tahunFiskal')->name('tahun-fiskal');
+    Route::get('/log-aktivitas', 'logAktivitas')->name('log-aktivitas');
+});
 
 Route::prefix('e-po')->name('e-po.')->group(function () {
     // ---------------- DISTRIBUTOR ----------------
@@ -70,7 +80,7 @@ Route::get('/pelaporan', function () {
     return view('pages.pelaporan.index');
 })->name('pelaporan.index');
 
-// Route Sementara Modul Master Data Admin (PJ: Suci)
+// Route Master Data Admin (Redirect ke Portal Admin)
 Route::get('/master-data', function () {
-    return view('pages.admin.index');
+    return redirect()->route('admin.ringkasan');
 })->name('admin.index');

@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Admin - PT Yoke Food Industries Indonesia</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        admin: {
+                            navy: '#0B132B',
+                            slate: '#1E293B',
+                            bg: '#EFF5F9',
+                            red: '#DC2626',
+                            green: '#047857'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+
+    <!-- Admin Portal Mock Store -->
+    <script src="js/admin-portal.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-[#EFF5F9] text-slate-800 antialiased min-h-screen flex"
+      x-data="{
+          activeTab: 'ringkasan',
+          showLogoutModal: false,
+          toasts: [],
+
+          // Central Data Store
+          users: [],
+          permissions: [],
+          distributors: [],
+          products: [],
+          fiscalPeriods: [],
+          logs: [],
+          activePeriod: null,
+
+          // Page: Pengguna State
+          userSearchQuery: '',
+          userRoleFilter: 'Semua',
+          showUserForm: false,
+          isEditingUser: false,
+          editUserId: null,
+          userFormData: { nama: '', email: '', peran: 'Distributor' },
+
+          // Page: Distributor State
+          distWilayahFilter: 'Semua',
+          showDistForm: false,
+          distFormData: { nama: '', kontak: '', telepon: '', wilayah: 'Sumbar' },
+
+          // Page: Produk State
+          showProductForm: false,
+          productFormData: { kode: '', nama: '', harga: 150000, isi: 2000 },
+          selectedSkuId: 1,
+          jumlahKontainer: 5,
+
+          // Page: Fiskal State
+          showFiscalForm: false,
+          inputTahunMulai: 2028,
+          months: ['Okt', 'Nov', 'Des', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep'],
+          selectedMonth: 'Okt',
+
+          // Page: Log State
+          logSearchQuery: '',
+          logActionFilter: 'Semua',
+
+          init() {
+              this.users = adminStore.load('users');
+              this.permissions = adminStore.load('permissions');
+              this.distributors = adminStore.load('distributors');
+              this.products = adminStore.load('products');
+              this.fiscalPeriods = adminStore.load('fiscalPeriods');
+              this.logs = adminStore.load('logs');
+              this.activePeriod = this.fiscalPeriods.find(p => p.status === 'Aktif') || this.fiscalPeriods[1];
+
+              if (this.products.length > 0) {
+                  this.selectedSkuId = this.products[0].id;
+              }
+
+              // Listen to custom log events
+              window.addEventListener('admin-log-added', (e) => {
+                  this.logs.unshift(e.detail);
+              });
+          },
+
+          addToast(message, type = 'success') {
+              const id = Date.now();
+              this.toasts.push({ id, message, type });
+              setTimeout(() => {
+                  this.toasts = this.toasts.filter(t => t.id !== id);
+              }, 3500);
+          },
+
+          // Computed Helpers: Dashboard
+          get activeUsersCount() {
+              return this.users.filter(u => u.status === 'Aktif').length;
+          },
+          get sumbarDistCount() {
+              return this.distributors.filter(d => d.wilayah === 'Sumbar').length;
+          },
+          get riauDistCount() {
+              return this.distributors.filter(d => d.wilayah === 'Riau').length;
+          },
+          get roleCounts() {
+              const counts = { Admin: 0, Distributor: 0, 'Logistik Pusat': 0, SAM: 0 };
+              this.users.forEach(u => {
+                  if (counts[u.peran] !== undefined) counts[u.peran]++;
+              });
+              return counts;
+          },
+
+          // User Methods
+          get filteredUsers() {
+              return this.users.filter(u => {
+                  const matchRole = this.userRoleFilter === 'Semua' || u.peran === this.userRoleFilter;
+                  const q = this.userSearchQuery.toLowerCase().trim();
+                  const matchQuery = !q || u.nama.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+                  return matchRole && matchQuery;
+              });
+          },
+          openCreateUser() {
+              this.isEditingUser = false;
+              this.editUserId = null;
+              this.userFormData = { nama: '', email: '', peran: 'Distributor' };
+              this.showUserForm = true;
+          },
+          openEditUser(user) {
+              this.isEditingUser = true;
+              this.editUserId = user.id;
+              this.userFormData = { nama: user.nama, email: user.email, peran: user.peran };
+              this.showUserForm = true;
+          },
+          saveUser() {
+              if (!this.userFormData.nama.trim() || !this.userFormData.email.trim()) {
+                  this.addToast('Lengkapi nama dan email pengguna.', 'error');
+                  return;
+              }
+              if (this.isEditingUser) {
+                  const idx = this.users.findIndex(u => u.id === this.editUserId);
+                  if (idx !== -1) {
+                      this.users[idx].nama = this.userFormData.nama;
+                      this.users[idx].email = this.userFormData.email;
+                      this.users[idx].peran = this.userFormData.peran;
+                      this.users[idx].inisial = adminStore.generateInitials(this.userFormData.nama);
+                      adminStore.save('users', this.users);
+                      adminStore.logActivity('Ubah', 'Kelola Pengguna', `Memperbarui peran ${this.userFormData.nama} menjadi ${this.userFormData.peran}`);
+                      this.addToast(`Profil ${this.userFormData.nama} berhasil diperbarui.`, 'success');
+                  }
+              } else {
+                  const newUser = {
+                      id: Date.now(),
+                      nama: this.userFormData.nama,
+                      email: this.userFormData.email,
+                      peran: this.userFormData.peran,
+                      status: 'Aktif',
+                      loginTerakhir: 'Baru dibuat',
+                      inisial: adminStore.generateInitials(this.userFormData.nama)
+                  };
+                  this.users.unshift(newUser);
+                  adminStore.save('users', this.users);
+                  adminStore.logActivity('Tambah', 'Kelola Pengguna', `Menambahkan pengguna baru ${this.userFormData.nama}`);
+                  this.addToast(`Pengguna ${this.userFormData.nama} berhasil didaftarkan.`, 'success');
+              }
+              this.showUserForm = false;
+          },
+          toggleUserStatus(user) {
+              user.status = user.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+              adminStore.save('users', this.users);
+              adminStore.logActivity('Ubah', 'Kelola Pengguna', `Mengubah status akun ${user.nama} menjadi ${user.status}`);
+              this.addToast(`Status ${user.nama} diubah ke ${user.status}.`, 'info');
+          },
+          deleteUser(user) {
+              if (user.peran === 'Admin') {
+                  this.addToast('Akun Administrator tidak dapat dihapus.', 'error');
+                  return;
+              }
+              if (confirm(`Hapus pengguna ${user.nama}?`)) {
+                  this.users = this.users.filter(u => u.id !== user.id);
+                  adminStore.save('users', this.users);
+                  adminStore.logActivity('Hapus', 'Kelola Pengguna', `Menghapus akun ${user.nama}`);
+                  this.addToast(`Pengguna ${user.nama} berhasil dihapus.`, 'success');
+              }
+          },
+          togglePermission(perm, roleKey) {
+              if (roleKey === 'admin') {
+                  this.addToast('Hak akses Admin dikunci untuk menjaga keamanan sistem.', 'error');
+                  return;
+              }
+              perm[roleKey] = !perm[roleKey];
+              adminStore.save('permissions', this.permissions);
+              const txt = perm[roleKey] ? 'diberikan' : 'dicabut';
+              adminStore.logActivity('Ubah', 'Kelola Pengguna', `Otorisasi ${perm.modul} ${txt} untuk ${roleKey.toUpperCase()}`);
+              this.addToast(`Hak akses modul ${perm.modul} berhasil diperbarui.`, 'success');
+          },
+
+          // Distributor Methods
+          get filteredDistributors() {
+              if (this.distWilayahFilter === 'Semua') return this.distributors;
+              return this.distributors.filter(d => d.wilayah === this.distWilayahFilter);
+          },
+          saveDistributor() {
+              if (!this.distFormData.nama.trim() || !this.distFormData.kontak.trim()) {
+                  this.addToast('Lengkapi nama perusahaan dan kontak resmi.', 'error');
+                  return;
+              }
+              const kode = 'DST-' + String(this.distributors.length + 1).padStart(3, '0');
+              const newDist = {
+                  id: Date.now(),
+                  kode: kode,
+                  nama: this.distFormData.nama,
+                  kontak: this.distFormData.kontak,
+                  telepon: this.distFormData.telepon || '0751-000-000',
+                  wilayah: this.distFormData.wilayah
+              };
+              this.distributors.push(newDist);
+              adminStore.save('distributors', this.distributors);
+              adminStore.logActivity('Tambah', 'Master Distributor', `Menambahkan ${newDist.nama} (${newDist.wilayah})`);
+              this.addToast(`Distributor ${newDist.nama} berhasil ditambahkan.`, 'success');
+              this.showDistForm = false;
+              this.distFormData = { nama: '', kontak: '', telepon: '', wilayah: 'Sumbar' };
+          },
+          deleteDistributor(dist) {
+              if (confirm(`Hapus distributor ${dist.nama}?`)) {
+                  this.distributors = this.distributors.filter(d => d.id !== dist.id);
+                  adminStore.save('distributors', this.distributors);
+                  adminStore.logActivity('Hapus', 'Master Distributor', `Menghapus distributor ${dist.nama}`);
+                  this.addToast(`Distributor ${dist.nama} berhasil dihapus.`, 'success');
+              }
+          },
+
+          // Product Methods
+          get selectedProduct() {
+              return this.products.find(p => p.id === this.selectedSkuId) || this.products[0] || null;
+          },
+          get calculatedTotalCartons() {
+              if (!this.selectedProduct) return 0;
+              return (parseInt(this.jumlahKontainer) || 0) * (this.selectedProduct.isi || 2000);
+          },
+          get calculatedTotalValue() {
+              if (!this.selectedProduct) return 0;
+              return this.calculatedTotalCartons * (this.selectedProduct.harga || 0);
+          },
+          saveProduct() {
+              if (!this.productFormData.nama.trim() || !this.productFormData.harga) {
+                  this.addToast('Lengkapi nama dan harga per karton.', 'error');
+                  return;
+              }
+              const harga = parseInt(this.productFormData.harga);
+              const isi = parseInt(this.productFormData.isi) || 2000;
+              const nextNum = this.products.length + 1;
+              const newP = {
+                  id: Date.now(),
+                  kode: this.productFormData.kode || ('SKU-' + String(nextNum).padStart(3, '0')),
+                  nama: this.productFormData.nama,
+                  harga: harga,
+                  isi: isi,
+                  nilai: harga * isi
+              };
+              this.products.push(newP);
+              adminStore.save('products', this.products);
+              adminStore.logActivity('Tambah', 'Master Produk (SKU)', `Menambahkan SKU baru ${newP.kode}`);
+              this.addToast(`Produk SKU ${newP.kode} berhasil disimpan.`, 'success');
+              this.showProductForm = false;
+              this.productFormData = { kode: '', nama: '', harga: 150000, isi: 2000 };
+          },
+          deleteProduct(p) {
+              if (this.products.length <= 1) {
+                  this.addToast('Minimal harus ada 1 master produk SKU.', 'error');
+                  return;
+              }
+              if (confirm(`Hapus SKU ${p.kode}?`)) {
+                  this.products = this.products.filter(item => item.id !== p.id);
+                  if (this.selectedSkuId === p.id) this.selectedSkuId = this.products[0].id;
+                  adminStore.save('products', this.products);
+                  adminStore.logActivity('Hapus', 'Master Produk (SKU)', `Menghapus SKU ${p.kode}`);
+                  this.addToast(`Produk SKU ${p.kode} berhasil dihapus.`, 'success');
+              }
+          },
+
+          // Fiscal Period Methods
+          get calculatedRentang() {
+              const y = parseInt(this.inputTahunMulai) || 2028;
+              return `1 Oktober ${y} – 30 September ${y + 1} (${y}/${y + 1})`;
+          },
+          savePeriod() {
+              const y = parseInt(this.inputTahunMulai);
+              const tahun = `${y}/${y + 1}`;
+              const rentang = `1 Oktober ${y} – 30 September ${y + 1}`;
+              if (this.fiscalPeriods.some(p => p.tahun === tahun)) {
+                  this.addToast(`Periode ${tahun} sudah ada.`, 'error');
+                  return;
+              }
+              const newP = { id: Date.now(), tahun: tahun, rentang: rentang, status: 'Draf' };
+              this.fiscalPeriods.unshift(newP);
+              adminStore.save('fiscalPeriods', this.fiscalPeriods);
+              adminStore.logActivity('Tambah', 'Tahun Fiskal', `Membuat draf periode ${tahun}`);
+              this.addToast(`Draf periode ${tahun} berhasil dibuat.`, 'success');
+              this.showFiscalForm = false;
+          },
+          activatePeriod(p) {
+              if (confirm(`Aktifkan tahun fiskal ${p.tahun}? Periode berjalan saat ini akan diselesaikan.`)) {
+                  this.fiscalPeriods.forEach(item => {
+                      if (item.status === 'Aktif') item.status = 'Selesai';
+                  });
+                  p.status = 'Aktif';
+                  this.activePeriod = p;
+                  adminStore.save('fiscalPeriods', this.fiscalPeriods);
+                  adminStore.logActivity('Ubah', 'Tahun Fiskal', `Mengaktifkan periode ${p.tahun}`);
+                  this.addToast(`Tahun fiskal ${p.tahun} kini aktif.`, 'success');
+              }
+          },
+
+          // Log Methods
+          get filteredLogs() {
+              return this.logs.filter(l => {
+                  const matchAction = this.logActionFilter === 'Semua' || l.aksi === this.logActionFilter;
+                  const q = this.logSearchQuery.toLowerCase().trim();
+                  const matchQ = !q || l.pengguna.toLowerCase().includes(q) || l.modul.toLowerCase().includes(q) || l.keterangan.toLowerCase().includes(q) || l.ip.includes(q);
+                  return matchAction && matchQ;
+              });
+          },
+          exportLogFile() {
+              if (this.filteredLogs.length === 0) {
+                  this.addToast('Tidak ada data log untuk diekspor.', 'error');
+                  return;
+              }
+              const headers = ['Waktu', 'Pengguna', 'Peran', 'Aksi', 'Modul', 'Keterangan', 'Alamat IP'];
+              const rows = [headers.join(',')];
+              this.filteredLogs.forEach(l => {
+                  rows.push([`&quot;${l.waktu}&quot;`, `&quot;${l.pengguna}&quot;`, `&quot;${l.peran}&quot;`, `&quot;${l.aksi}&quot;`, `&quot;${l.modul}&quot;`, `&quot;${l.keterangan}&quot;`, `&quot;${l.ip}&quot;`].join(','));
+              });
+              const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `log_aktivitas_${Date.now()}.csv`;
+              a.click();
+              adminStore.logActivity('Ekspor', 'Log Aktivitas', `Mengekspor log 1–23 Okt 2026`);
+              this.addToast('Log aktivitas berhasil diekspor ke file CSV.', 'success');
+          }
+      }"
+      x-init="init()"
+      @show-toast.window="addToast($event.detail.message, $event.detail.type)">
+
+    <!-- Sidebar Navigation Sesuai Dokumen -->
+    <aside class="w-64 bg-[#0B132B] text-slate-300 flex-shrink-0 flex flex-col justify-between min-h-screen border-r border-slate-800/80 select-none">
+        <div>
+            <!-- Header Brand -->
+            <div class="p-6 pb-5 flex items-center space-x-3.5">
+                <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white text-lg shadow-md shadow-red-950/40">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <h1 class="text-white font-bold text-sm leading-tight tracking-wide">Portal Admin</h1>
+                    <p class="text-[11px] text-slate-400 font-medium">Administrator Sistem</p>
+                </div>
+            </div>
+
+            <!-- Menus -->
+            <nav class="px-4 py-2 space-y-6 text-xs">
+                <!-- Ringkasan -->
+                <div>
+                    <button @click="activeTab = 'ringkasan'" 
+                            type="button"
+                            class="w-full flex items-center space-x-3 px-4 py-3 rounded-2xl font-semibold transition-all duration-150"
+                            :class="activeTab === 'ringkasan' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
+                        <i class="fa-solid fa-table-cells-large text-sm w-4 text-center"></i>
+                        <span class="text-[13px]">Ringkasan</span>
+                    </button>
+                </div>
+
+                <!-- MASTER DATA -->
+                <div>
+                    <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-widest px-4 mb-2">
+                        MASTER DATA
+                    </div>
+                    <div class="space-y-1">
+                        <!-- Pengguna & Hak Akses -->
+                        <button @click="activeTab = 'pengguna'" 
+                                type="button"
+                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
+                                :class="activeTab === 'pengguna' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
+                            <i class="fa-solid fa-users text-sm w-4 text-center"></i>
+                            <span class="text-[12.5px]">Pengguna & Hak Akses</span>
+                        </button>
+
+                        <!-- Data Distributor -->
+                        <button @click="activeTab = 'distributor'" 
+                                type="button"
+                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
+                                :class="activeTab === 'distributor' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
+                            <i class="fa-solid fa-store text-sm w-4 text-center"></i>
+                            <span class="text-[12.5px]">Data Distributor</span>
+                        </button>
+
+                        <!-- Data Produk (SKU) -->
+                        <button @click="activeTab = 'produk'" 
+                                type="button"
+                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
+                                :class="activeTab === 'produk' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
+                            <i class="fa-solid fa-cube text-sm w-4 text-center"></i>
+                            <span class="text-[12.5px]">Data Produk (SKU)</span>
+                        </button>
+
+                        <!-- Periode Tahun Fiskal -->
+                        <button @click="activeTab = 'tahun-fiskal'" 
+                                type="button"
+                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
+                                :class="activeTab === 'tahun-fiskal' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
+                            <i class="fa-solid fa-calendar-days text-sm w-4 text-center"></i>
+                            <span class="text-[12.5px]">Periode Tahun Fiskal</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- PENGAWASAN -->
+                <div>
+                    <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-widest px-4 mb-2">
+                        PENGAWASAN
+                    </div>
+                    <div class="space-y-1">
+                        <!-- Log Aktivitas -->
+                        <button @click="activeTab = 'log-aktivitas'" 
+                                type="button"
+                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
+                                :class="activeTab === 'log-aktivitas' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
+                            <i class="fa-solid fa-file-lines text-sm w-4 text-center"></i>
+                            <span class="text-[12.5px]">Log Aktivitas</span>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </div>
+
+        <!-- Bottom User Card -->
+        <div class="p-4 border-t border-slate-800/80">
+            <div class="bg-[#121B35] rounded-2xl p-3 border border-slate-700/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 bg-red-600 text-white rounded-xl flex items-center justify-center font-bold text-xs tracking-wider shadow-sm">
+                        RW
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-bold text-white truncate">Rina Wulandari</p>
+                        <p class="text-[11px] text-slate-400 truncate">Admin</p>
+                    </div>
+                </div>
+                
+                <button @click="showLogoutModal = true" 
+                        type="button"
+                        class="mt-3 w-full bg-[#0B132B] hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold py-2 rounded-xl transition text-center flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-[11px]"></i>
+                    <span>Keluar</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Workspace Area -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto min-h-screen p-8 lg:p-10">
+        
+        <!-- Quick Control Bar -->
+        <div class="mb-5 flex items-center justify-between text-xs text-slate-400">
+            <div class="flex items-center space-x-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-medium text-slate-500">Live Mock Data Store &middot; PT Yoke Food Industries Indonesia</span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button @click="if(confirm('Kembalikan seluruh data ke awal?')) adminStore.resetAll()" 
+                        type="button" 
+                        class="hover:text-red-600 transition flex items-center space-x-1.5 px-3 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs font-medium text-slate-600">
+                    <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                    <span>Reset Data Dummy</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- =================== TAB 1: RINGKASAN =================== -->
+        <div x-show="activeTab === 'ringkasan'" class="space-y-6">
+            <div>
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                    RINGKASAN
+                </div>
+                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
+                    Selamat datang, Rina
+                </h1>
+                <p class="text-sm text-slate-500 font-normal mt-1">
+                    Pantau kondisi master data dan aktivitas pengguna sistem.
+                </p>
+            </div>
+
+            <!-- 4 Stats Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PENGGUNA AKTIF</div>
+                    <div class="mt-2 text-4xl font-black text-slate-900" x-text="activeUsersCount">7</div>
+                    <div class="mt-1 text-xs text-slate-500">dari <span x-text="users.length">8</span> akun terdaftar</div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">DISTRIBUTOR</div>
+                    <div class="mt-2 text-4xl font-black text-slate-900" x-text="distributors.length">6</div>
+                    <div class="mt-1 text-xs text-slate-500">Sumbar <span x-text="sumbarDistCount">3</span> · Riau <span x-text="riauDistCount">3</span></div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PRODUK (SKU)</div>
+                    <div class="mt-2 text-4xl font-black text-slate-900" x-text="products.length">3</div>
+                    <div class="mt-1 text-xs text-slate-500">katalog master aktif</div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">TAHUN FISKAL</div>
+                    <div class="mt-2 text-3xl font-black text-slate-900 tracking-tight" x-text="activePeriod?.tahun || '2026/2027'">2026/2027</div>
+                    <div class="mt-1 text-xs text-slate-500">hari ke-23 dari 365</div>
+                </div>
+            </div>
+
+            <!-- Middle Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Pengguna per peran -->
+                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                    <h2 class="text-base font-bold text-slate-900 tracking-tight mb-5">Pengguna per peran</h2>
+                    <div class="space-y-4 text-xs font-medium">
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-slate-900">Admin</span>
+                                <span class="text-slate-500" x-text="roleCounts['Admin'] + ' akun'">1 akun</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-red-600 h-2 rounded-full" :style="`width: ${(roleCounts['Admin'] / users.length) * 100}%`"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-slate-900">Distributor</span>
+                                <span class="text-slate-500" x-text="roleCounts['Distributor'] + ' akun'">3 akun</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-emerald-600 h-2 rounded-full" :style="`width: ${(roleCounts['Distributor'] / users.length) * 100}%`"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-slate-900">Logistik Pusat</span>
+                                <span class="text-slate-500" x-text="roleCounts['Logistik Pusat'] + ' akun'">2 akun</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#0B132B] h-2 rounded-full" :style="`width: ${(roleCounts['Logistik Pusat'] / users.length) * 100}%`"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-slate-900">SAM</span>
+                                <span class="text-slate-500" x-text="roleCounts['SAM'] + ' akun'">2 akun</span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-[#0B132B] h-2 rounded-full" :style="`width: ${(roleCounts['SAM'] / users.length) * 100}%`"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aksi Cepat -->
+                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                    <h2 class="text-base font-bold text-slate-900 tracking-tight mb-5">Aksi cepat</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
+                        <button @click="activeTab = 'pengguna'; openCreateUser()" 
+                                class="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
+                            Tambah pengguna
+                        </button>
+                        <button @click="activeTab = 'distributor'; showDistForm = true" 
+                                class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
+                            Tambah distributor
+                        </button>
+                        <button @click="activeTab = 'produk'; showProductForm = true" 
+                                class="bg-[#0B132B] hover:bg-slate-900 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
+                            Tambah produk
+                        </button>
+                        <button @click="activeTab = 'tahun-fiskal'" 
+                                class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-2xs transition">
+                            Atur tahun fiskal
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aktivitas Terbaru -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                <div class="flex items-center justify-between mb-5">
+                    <h2 class="text-base font-bold text-slate-900 tracking-tight">Aktivitas terbaru</h2>
+                    <button @click="activeTab = 'log-aktivitas'" 
+                            class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-xl transition">
+                        Lihat semua log
+                    </button>
+                </div>
+
+                <div class="divide-y divide-slate-100">
+                    <template x-for="log in logs.slice(0, 5)" :key="log.id">
+                        <div class="py-3.5 flex items-center justify-between text-xs">
+                            <div class="flex items-center space-x-3 min-w-0 pr-4">
+                                <span class="px-2.5 py-1 rounded-md font-bold text-[11px] text-white flex-shrink-0"
+                                      :class="{
+                                          'bg-[#0B132B]': log.aksi === 'Ubah' || log.aksi === 'Login' || log.aksi === 'Ekspor',
+                                          'bg-emerald-600': log.aksi === 'Tambah',
+                                          'bg-red-600': log.aksi === 'Hapus'
+                                      }"
+                                      x-text="log.aksi"></span>
+                                <div class="truncate text-slate-700">
+                                    <span class="font-bold text-slate-900" x-text="log.pengguna"></span>
+                                    <span class="text-slate-400 mx-1">&middot;</span>
+                                    <span x-text="log.keterangan"></span>
+                                </div>
+                            </div>
+                            <div class="text-slate-400 font-normal whitespace-nowrap text-[11px]" x-text="log.waktu"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- =================== TAB 2: PENGGUNA & HAK AKSES =================== -->
+        <div x-show="activeTab === 'pengguna'" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Pengguna & Hak Akses</h1>
+                    <p class="text-sm text-slate-500 font-normal mt-1">Atur pendaftaran akun, pembaruan profil, penetapan peran, dan otorisasi hak akses.</p>
+                </div>
+                <button x-show="!showUserForm" @click="openCreateUser()" 
+                        type="button"
+                        class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                    <i class="fa-solid fa-plus text-[11px]"></i>
+                    <span>Tambah Pengguna</span>
+                </button>
+            </div>
+
+            <!-- Form Pengguna Baru -->
+            <div x-cloak x-show="showUserForm" class="bg-white rounded-2xl p-6 border-2 border-red-500 shadow-sm">
+                <h2 class="text-sm font-bold text-slate-900 mb-4" x-text="isEditingUser ? 'Ubah profil pengguna' : 'Pengguna baru'"></h2>
+                <form @submit.prevent="saveUser()" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA LENGKAP</label>
+                            <input type="text" x-model="userFormData.nama" placeholder="Nama pengguna" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">EMAIL</label>
+                            <input type="email" x-model="userFormData.email" placeholder="nama@perusahaan.id" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">PERAN</label>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="r in ['Admin', 'Distributor', 'Logistik Pusat', 'SAM']" :key="r">
+                                <button type="button" @click="userFormData.peran = r"
+                                        class="px-4 py-2 rounded-xl text-xs font-semibold transition"
+                                        :class="userFormData.peran === r ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'"
+                                        x-text="r"></button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex items-center space-x-2">
+                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan</button>
+                        <button type="button" @click="showUserForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Table Card -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="w-full md:w-96">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">CARI PENGGUNA</label>
+                        <div class="relative">
+                            <input type="text" x-model="userSearchQuery" placeholder="Nama atau email"
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500">
+                            <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-xs"></i>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 self-end">
+                        <template x-for="tab in ['Semua', 'Admin', 'Distributor', 'Logistik Pusat', 'SAM']" :key="tab">
+                            <button type="button" @click="userRoleFilter = tab"
+                                    class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
+                                    :class="userRoleFilter === tab ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                    x-text="tab"></button>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="pb-3 px-3">PENGGUNA</th>
+                                <th class="pb-3 px-3">PERAN</th>
+                                <th class="pb-3 px-3">STATUS</th>
+                                <th class="pb-3 px-3">LOGIN TERAKHIR</th>
+                                <th class="pb-3 px-3 text-right">AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="user in filteredUsers" :key="user.id">
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3 px-3">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-8 h-8 rounded-lg bg-[#0B132B] text-white flex items-center justify-center font-bold text-[11px] flex-shrink-0" x-text="user.inisial"></div>
+                                            <div>
+                                                <div class="font-bold text-slate-900" x-text="user.nama"></div>
+                                                <div class="text-[11px] text-slate-500" x-text="user.email"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-3">
+                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                              :class="{
+                                                  'bg-red-600': user.peran === 'Admin',
+                                                  'bg-emerald-600': user.peran === 'Distributor',
+                                                  'bg-[#0B132B]': user.peran === 'Logistik Pusat',
+                                                  'bg-slate-600': user.peran === 'SAM'
+                                              }"
+                                              x-text="user.peran"></span>
+                                    </td>
+                                    <td class="py-3 px-3">
+                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                              :class="user.status === 'Aktif' ? 'bg-emerald-600' : 'bg-slate-700'"
+                                              x-text="user.status"></span>
+                                    </td>
+                                    <td class="py-3 px-3 text-slate-500" x-text="user.loginTerakhir"></td>
+                                    <td class="py-3 px-3 text-right">
+                                        <div class="inline-flex items-center space-x-1.5">
+                                            <button @click="openEditUser(user)" class="w-7 h-7 rounded-lg bg-slate-500 hover:bg-slate-600 text-white flex items-center justify-center">
+                                                <i class="fa-solid fa-pencil text-[10px]"></i>
+                                            </button>
+                                            <button @click="toggleUserStatus(user)" class="w-7 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center">
+                                                <i class="fa-solid fa-power-off text-[10px]"></i>
+                                            </button>
+                                            <button @click="deleteUser(user)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center">
+                                                <i class="fa-solid fa-trash text-[10px]"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Matriks Hak Akses -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900 tracking-tight">Matriks hak akses per peran</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Klik sel untuk memberi atau mencabut akses modul. Hak akses Admin dikunci.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="pb-3 px-4 w-1/3">MODUL</th>
+                                <th class="pb-3 px-4 text-center">ADMIN</th>
+                                <th class="pb-3 px-4 text-center">DISTRIBUTOR</th>
+                                <th class="pb-3 px-4 text-center">LOGISTIK PUSAT</th>
+                                <th class="pb-3 px-4 text-center">SAM</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="perm in permissions" :key="perm.modul">
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="py-3.5 px-4 font-semibold text-slate-800" x-text="perm.modul"></td>
+                                    <td class="py-3.5 px-4 text-center cursor-not-allowed" @click="togglePermission(perm, 'admin')">
+                                        <div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'distributor')">
+                                        <template x-if="perm.distributor"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
+                                        <template x-if="!perm.distributor"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'logistik')">
+                                        <template x-if="perm.logistik"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
+                                        <template x-if="!perm.logistik"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'sam')">
+                                        <template x-if="perm.sam"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
+                                        <template x-if="!perm.sam"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- =================== TAB 3: DATA DISTRIBUTOR =================== -->
+        <div x-show="activeTab === 'distributor'" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Data Distributor</h1>
+                    <p class="text-sm text-slate-500 font-normal mt-1">Kelola profil distributor, cakupan wilayah operasional (Sumbar dan Riau), dan kontak resmi perusahaan.</p>
+                </div>
+                <button x-show="!showDistForm" @click="showDistForm = true" type="button"
+                        class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                    <i class="fa-solid fa-plus text-[11px]"></i>
+                    <span>Tambah distributor</span>
+                </button>
+            </div>
+
+            <!-- Form Distributor Baru -->
+            <div x-cloak x-show="showDistForm" class="bg-white rounded-2xl p-6 border-2 border-emerald-500/60 shadow-sm">
+                <h2 class="text-sm font-bold text-slate-900 mb-4">Distributor baru</h2>
+                <form @submit.prevent="saveDistributor()" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA PERUSAHAAN</label>
+                            <input type="text" x-model="distFormData.nama" placeholder="PT / CV ..." required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA KONTAK RESMI</label>
+                            <input type="text" x-model="distFormData.kontak" placeholder="Nama penanggung jawab" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">TELEPON</label>
+                            <input type="text" x-model="distFormData.telepon" placeholder="0xxx-xxx-xxx" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">CAKUPAN WILAYAH</label>
+                        <div class="flex items-center space-x-2">
+                            <button type="button" @click="distFormData.wilayah = 'Sumbar'"
+                                    class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
+                                    :class="distFormData.wilayah === 'Sumbar' ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'">Sumbar</button>
+                            <button type="button" @click="distFormData.wilayah = 'Riau'"
+                                    class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
+                                    :class="distFormData.wilayah === 'Riau' ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'">Riau</button>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex items-center space-x-2">
+                        <button type="submit" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan</button>
+                        <button type="button" @click="showDistForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Table Card -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                <div class="flex items-center space-x-2">
+                    <template x-for="tab in ['Semua', 'Sumbar', 'Riau']" :key="tab">
+                        <button type="button" @click="distWilayahFilter = tab"
+                                class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
+                                :class="distWilayahFilter === tab ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                x-text="tab"></button>
+                    </template>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="pb-3 px-4 w-28">KODE</th>
+                                <th class="pb-3 px-4">DISTRIBUTOR</th>
+                                <th class="pb-3 px-4">WILAYAH</th>
+                                <th class="pb-3 px-4">KONTAK RESMI</th>
+                                <th class="pb-3 px-4 text-right">AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="dist in filteredDistributors" :key="dist.id">
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3.5 px-4 font-semibold text-slate-700" x-text="dist.kode"></td>
+                                    <td class="py-3.5 px-4 font-bold text-slate-900" x-text="dist.nama"></td>
+                                    <td class="py-3.5 px-4">
+                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                              :class="dist.wilayah === 'Sumbar' ? 'bg-emerald-600' : 'bg-red-600'"
+                                              x-text="dist.wilayah"></span>
+                                    </td>
+                                    <td class="py-3.5 px-4">
+                                        <div class="font-bold text-slate-900" x-text="dist.kontak"></div>
+                                        <div class="text-[11px] text-slate-500" x-text="dist.telepon"></div>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <button @click="deleteDistributor(dist)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white inline-flex items-center justify-center">
+                                            <i class="fa-solid fa-trash text-[10px]"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- =================== TAB 4: DATA PRODUK (SKU) =================== -->
+        <div x-show="activeTab === 'produk'" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Data Produk (SKU)</h1>
+                    <p class="text-sm text-slate-500 font-normal mt-1">Atur katalog produk master, struktur harga, dan formula konversi satuan isi kontainer.</p>
+                </div>
+                <button x-show="!showProductForm" @click="showProductForm = true" type="button"
+                        class="bg-[#0B132B] hover:bg-slate-900 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                    <i class="fa-solid fa-plus text-[11px]"></i>
+                    <span>Tambah SKU</span>
+                </button>
+            </div>
+
+            <!-- Form SKU Baru -->
+            <div x-cloak x-show="showProductForm" class="bg-white rounded-2xl p-6 border-2 border-slate-900 shadow-sm">
+                <h2 class="text-sm font-bold text-slate-900 mb-4">Tambah Master Produk SKU Baru</h2>
+                <form @submit.prevent="saveProduct()" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">KODE SKU</label>
+                            <input type="text" x-model="productFormData.kode" placeholder="SKU-004" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA PRODUK</label>
+                            <input type="text" x-model="productFormData.nama" placeholder="Contoh: FAN Apple 325ml" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">HARGA / KARTON (RP)</label>
+                            <input type="number" x-model="productFormData.harga" step="1000" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">ISI / KONTAINER</label>
+                            <input type="number" x-model="productFormData.isi" value="2000" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                        </div>
+                    </div>
+                    <div class="pt-2 flex items-center space-x-2">
+                        <button type="submit" class="bg-[#0B132B] hover:bg-slate-900 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan SKU</button>
+                        <button type="button" @click="showProductForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Table Card -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="pb-3 px-4 w-28">SKU</th>
+                                <th class="pb-3 px-4">PRODUK</th>
+                                <th class="pb-3 px-4">HARGA / KARTON</th>
+                                <th class="pb-3 px-4">ISI / KONTAINER</th>
+                                <th class="pb-3 px-4">NILAI / KONTAINER</th>
+                                <th class="pb-3 px-4 text-right">AKSI</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="prod in products" :key="prod.id">
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3.5 px-4 font-semibold text-slate-700" x-text="prod.kode"></td>
+                                    <td class="py-3.5 px-4 font-bold text-slate-900" x-text="prod.nama"></td>
+                                    <td class="py-3.5 px-4 text-slate-700 font-medium" x-text="adminStore.formatRupiah(prod.harga)"></td>
+                                    <td class="py-3.5 px-4 text-slate-700 font-medium" x-text="adminStore.formatNumber(prod.isi) + ' karton'"></td>
+                                    <td class="py-3.5 px-4 font-extrabold text-slate-900" x-text="adminStore.formatRupiah(prod.nilai)"></td>
+                                    <td class="py-3.5 px-4 text-right">
+                                        <button @click="deleteProduct(prod)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white inline-flex items-center justify-center">
+                                            <i class="fa-solid fa-trash text-[10px]"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Kalkulator Konversi Kontainer -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900 tracking-tight">Kalkulator konversi kontainer</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Karton = jumlah kontainer &times; isi karton per kontainer</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <template x-for="p in products" :key="p.id">
+                        <button type="button" @click="selectedSkuId = p.id"
+                                class="px-4 py-2 rounded-xl text-xs font-semibold transition"
+                                :class="selectedSkuId === p.id ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                x-text="p.kode + ' · ' + p.nama"></button>
+                    </template>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch pt-2">
+                    <div class="bg-[#EBF3FB] rounded-2xl p-5 border border-blue-100 flex flex-col justify-center">
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">JUMLAH KONTAINER</label>
+                        <input type="number" x-model.number="jumlahKontainer" min="1" max="500"
+                               class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0B132B]">
+                        <span class="text-[10px] text-slate-400 mt-1.5">1 kontainer = <span x-text="adminStore.formatNumber(selectedProduct?.isi || 2000)"></span> karton</span>
+                    </div>
+
+                    <div class="bg-[#0B132B] text-white rounded-2xl p-5 shadow-xs flex flex-col justify-center">
+                        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total karton</div>
+                        <div class="mt-2 text-2xl font-black tracking-tight" x-text="adminStore.formatNumber(calculatedTotalCartons) + ' karton'">10.000 karton</div>
+                        <div class="mt-1 text-[11px] text-slate-400" x-text="`${jumlahKontainer || 0} kontainer × ${adminStore.formatNumber(selectedProduct?.isi || 2000)} karton`"></div>
+                    </div>
+
+                    <div class="bg-emerald-700 text-white rounded-2xl p-5 shadow-xs flex flex-col justify-center">
+                        <div class="text-[11px] font-semibold text-emerald-100 uppercase tracking-wider">Total nilai</div>
+                        <div class="mt-2 text-2xl font-black tracking-tight" x-text="adminStore.formatRupiah(calculatedTotalValue)">Rp 1.850.000.000</div>
+                        <div class="mt-1 text-[11px] text-emerald-100" x-text="`${adminStore.formatNumber(calculatedTotalCartons)} karton × ${adminStore.formatRupiah(selectedProduct?.harga || 0)}`"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- =================== TAB 5: PERIODE TAHUN FISKAL =================== -->
+        <div x-show="activeTab === 'tahun-fiskal'" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Periode Tahun Fiskal</h1>
+                    <p class="text-sm text-slate-500 font-normal mt-1">Rentang tahun fiskal 1 Oktober &ndash; 30 September menjadi acuan perhitungan kuota dan agregasi laporan.</p>
+                </div>
+                <button x-show="!showFiscalForm" @click="showFiscalForm = true" type="button"
+                        class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                    <i class="fa-solid fa-plus text-[11px]"></i>
+                    <span>Buat periode</span>
+                </button>
+            </div>
+
+            <!-- Top Card Periode Berjalan -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PERIODE BERJALAN</div>
+                        <div class="text-3xl font-black text-slate-900 tracking-tight mt-1" x-text="activePeriod?.tahun || '2026/2027'">2026/2027</div>
+                        <div class="text-xs text-slate-500 mt-0.5" x-text="activePeriod?.rentang || '1 Oktober 2026 – 30 September 2027'"></div>
+                    </div>
+                    <div class="sm:text-right">
+                        <div class="text-3xl font-black text-slate-900">6%</div>
+                        <div class="text-xs text-slate-500 mt-0.5">hari ke-23 dari 365</div>
+                    </div>
+                </div>
+
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div class="bg-red-600 h-2 rounded-full" style="width: 6%;"></div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 pt-1">
+                    <template x-for="m in months" :key="m">
+                        <button type="button" @click="selectedMonth = m"
+                                class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
+                                :class="selectedMonth === m ? 'bg-red-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                x-text="m"></button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Form Periode Baru -->
+            <div x-cloak x-show="showFiscalForm" class="bg-white rounded-2xl p-6 border-2 border-red-500 shadow-sm">
+                <h2 class="text-sm font-bold text-slate-900 mb-4">Periode baru</h2>
+                <form @submit.prevent="savePeriod()" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">TAHUN MULAI</label>
+                            <input type="number" x-model="inputTahunMulai" min="2020" max="2050" required
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Rentang otomatis</label>
+                            <div class="bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800"
+                                 x-text="calculatedRentang"></div>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex items-center space-x-2">
+                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan sebagai draf</button>
+                        <button type="button" @click="showFiscalForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Grid Periode -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <template x-for="p in fiscalPeriods" :key="p.id">
+                    <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-xl font-black text-slate-900 tracking-tight" x-text="p.tahun"></div>
+                                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold text-white uppercase tracking-wider"
+                                      :class="{
+                                          'bg-[#0B132B]': p.status === 'Draf' || p.status === 'Selesai',
+                                          'bg-emerald-600': p.status === 'Aktif'
+                                      }"
+                                      x-text="p.status"></span>
+                            </div>
+                            <div class="text-xs text-slate-500 leading-relaxed" x-text="p.rentang"></div>
+                        </div>
+                        <div class="mt-6">
+                            <template x-if="p.status === 'Draf'">
+                                <button type="button" @click="activatePeriod(p)"
+                                        class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2.5 rounded-xl text-xs text-center transition">Aktifkan periode</button>
+                            </template>
+                            <template x-if="p.status === 'Aktif'">
+                                <div class="text-emerald-700 text-xs font-bold py-2 flex items-center space-x-1.5"><i class="fa-solid fa-circle-check text-xs"></i><span>Sedang berjalan</span></div>
+                            </template>
+                            <template x-if="p.status === 'Selesai'">
+                                <div class="text-slate-400 text-xs py-2 font-medium">Tutup buku & diarsipkan</div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- =================== TAB 6: LOG AKTIVITAS =================== -->
+        <div x-show="activeTab === 'log-aktivitas'" class="space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">PENGAWASAN</div>
+                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Log Aktivitas</h1>
+                    <p class="text-sm text-slate-500 font-normal mt-1">Rekam jejak aktivitas pengguna (audit trail) untuk pengawasan sistem.</p>
+                </div>
+                <button @click="exportLogFile()" type="button"
+                        class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold px-4 py-2.5 rounded-xl text-xs shadow-2xs transition flex items-center space-x-2">
+                    <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                    <span>Ekspor log</span>
+                </button>
+            </div>
+
+            <!-- Table & Filters Card -->
+            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="w-full md:w-96">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">CARI LOG</label>
+                        <div class="relative">
+                            <input type="text" x-model="logSearchQuery" placeholder="Pengguna, modul, atau keterangan"
+                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-800">
+                            <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-xs"></i>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 self-end">
+                        <template x-for="tab in ['Semua', 'Login', 'Tambah', 'Ubah', 'Hapus', 'Ekspor']" :key="tab">
+                            <button type="button" @click="logActionFilter = tab"
+                                    class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
+                                    :class="logActionFilter === tab ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                    x-text="tab"></button>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th class="pb-3 px-3 w-40">WAKTU</th>
+                                <th class="pb-3 px-3 w-48">PENGGUNA</th>
+                                <th class="pb-3 px-3 w-24">AKSI</th>
+                                <th class="pb-3 px-3 w-40">MODUL</th>
+                                <th class="pb-3 px-3">KETERANGAN</th>
+                                <th class="pb-3 px-3 text-right w-32">ALAMAT IP</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <template x-for="log in filteredLogs" :key="log.id">
+                                <tr class="hover:bg-slate-50/80 transition-colors">
+                                    <td class="py-3.5 px-3 text-slate-500 whitespace-nowrap" x-text="log.waktu"></td>
+                                    <td class="py-3.5 px-3">
+                                        <div class="font-bold text-slate-900" x-text="log.pengguna"></div>
+                                        <div class="text-[11px] text-slate-500" x-text="log.peran"></div>
+                                    </td>
+                                    <td class="py-3.5 px-3">
+                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                              :class="{
+                                                  'bg-[#0B132B]': log.aksi === 'Ubah' || log.aksi === 'Login' || log.aksi === 'Ekspor',
+                                                  'bg-emerald-600': log.aksi === 'Tambah',
+                                                  'bg-red-600': log.aksi === 'Hapus'
+                                              }"
+                                              x-text="log.aksi"></span>
+                                    </td>
+                                    <td class="py-3.5 px-3 font-semibold text-slate-800" x-text="log.modul"></td>
+                                    <td class="py-3.5 px-3 text-slate-700 leading-relaxed" x-text="log.keterangan"></td>
+                                    <td class="py-3.5 px-3 text-right font-mono text-[11px] text-slate-500" x-text="log.ip"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-12 pt-6 border-t border-slate-200/80 text-xs text-slate-400">
+            Data pada tampilan ini adalah contoh untuk keperluan desain.
+        </footer>
+    </main>
+
+    <!-- Logout Modal -->
+    <div x-cloak x-show="showLogoutModal" 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100" @click.away="showLogoutModal = false">
+            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl mb-4 mx-auto">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-900 text-center">Keluar dari Portal Admin?</h3>
+            <p class="text-xs text-slate-500 text-center mt-2 leading-relaxed">
+                Anda akan mengakhiri sesi simulasi administrator Rina Wulandari.
+            </p>
+            <div class="mt-6 flex space-x-3">
+                <button @click="showLogoutModal = false" type="button" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition">Batal</button>
+                <button @click="showLogoutModal = false; addToast('Berhasil keluar dari sesi simulasi.', 'info')" type="button" class="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow-md transition">Ya, Keluar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Toast Notification Container -->
+    <div class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="pointer-events-auto flex items-center space-x-3 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold border transition-all duration-300"
+                 :class="{
+                     'bg-slate-900 text-white border-slate-800': toast.type === 'info',
+                     'bg-emerald-600 text-white border-emerald-700': toast.type === 'success',
+                     'bg-red-600 text-white border-red-700': toast.type === 'error'
+                 }">
+                <i :class="{
+                    'fa-solid fa-circle-check text-sm text-emerald-200': toast.type === 'success',
+                    'fa-solid fa-circle-xmark text-sm text-red-200': toast.type === 'error',
+                    'fa-solid fa-circle-info text-sm text-blue-200': toast.type === 'info'
+                }"></i>
+                <span x-text="toast.message"></span>
+            </div>
+        </template>
+    </div>
+
+</body>
+</html>
+

@@ -1,0 +1,2 @@
+@include('pages.admin.ringkasan')
+
