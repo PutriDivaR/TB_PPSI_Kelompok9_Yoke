@@ -51,20 +51,25 @@ Route::prefix('e-po')->name('e-po.')->group(function () {
     // ---------------- DISTRIBUTOR ----------------
     Route::prefix('distributor')->name('distributor.')->controller(DistributorEPOController::class)->group(function () {
         Route::get('/hitung-forecast', 'hitungForecast')->name('hitung-forecast')->defaults('role', 'distributor');  // Layar 1
-        Route::get('/ajukan-forecast', 'ajukanForecast')->name('ajukan-forecast')->defaults('role', 'distributor');  // Layar 2
+        Route::get('/ajukan-forecast', 'ajukanForecast')->name('ajukan-forecast')->defaults('role', 'distributor');  // Layar 2 (?periode=YYYY-MM)
         Route::post('/ajukan-forecast', 'submitForecast')->name('submit-forecast')->defaults('role', 'distributor');
-        Route::get('/input-epo', 'inputEpo')->name('input-epo')->defaults('role', 'distributor');                    // Layar 5
+        Route::delete('/forecast/{forecast}', 'hapusForecast')->name('hapus-forecast')->defaults('role', 'distributor');
+        Route::get('/input-epo', 'inputEpo')->name('input-epo')->defaults('role', 'distributor');                    // Layar 5A/5B
         Route::post('/input-epo', 'submitEpo')->name('submit-epo')->defaults('role', 'distributor');
-        Route::get('/epo-selesai', 'epoSelesai')->name('epo-selesai')->defaults('role', 'distributor');              // Layar 7
+        Route::delete('/epo/{po}', 'hapusEpo')->name('hapus-epo')->defaults('role', 'distributor');
+        Route::get('/epo-selesai/{po?}', 'epoSelesai')->name('epo-selesai')->defaults('role', 'distributor');        // Layar 7
+        Route::post('/konteks', 'ubahKonteks')->name('konteks')->defaults('role', 'distributor');
     });
 
     // ---------------- LOGISTIK PUSAT ----------------
     Route::prefix('logistik')->name('logistik.')->controller(LogistikEPOController::class)->group(function () {
-        Route::get('/antrean', 'antrean')->name('antrean')->defaults('role', 'logistik');                         // Layar 3
-        Route::get('/forecast/{id}', 'detailForecast')->name('detail-forecast')->defaults('role', 'logistik');    // Layar 4
-        Route::post('/forecast/{id}/tetapkan', 'tetapkanKuota')->name('tetapkan-kuota')->defaults('role', 'logistik');
-        Route::get('/epo/{id}/verifikasi', 'verifikasiEpo')->name('verifikasi-epo')->defaults('role', 'logistik'); // Layar 6
-        Route::post('/epo/{id}/setujui', 'setujuiEpo')->name('setujui-epo')->defaults('role', 'logistik');
+        Route::get('/antrean', 'antrean')->name('antrean')->defaults('role', 'logistik');                              // Layar 3
+        Route::get('/forecast/{forecast}', 'detailForecast')->name('detail-forecast')->defaults('role', 'logistik');   // Layar 4
+        Route::post('/forecast/{forecast}/mulai', 'mulaiForecast')->name('mulai-forecast')->defaults('role', 'logistik');
+        Route::post('/forecast/{forecast}/tetapkan', 'tetapkanKuota')->name('tetapkan-kuota')->defaults('role', 'logistik');
+        Route::get('/epo/{po}/verifikasi', 'verifikasiEpo')->name('verifikasi-epo')->defaults('role', 'logistik');     // Layar 6
+        Route::post('/epo/{po}/mulai', 'mulaiEpo')->name('mulai-epo')->defaults('role', 'logistik');
+        Route::post('/epo/{po}/setujui', 'setujuiEpo')->name('setujui-epo')->defaults('role', 'logistik');
     });
 });
 

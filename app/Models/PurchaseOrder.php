@@ -45,4 +45,10 @@ class PurchaseOrder extends YokeModel
     {
         return $this->hasMany(Pengiriman::class, 'id_po', 'id_po');
     }
+
+    // Relasi ke Detail PO
+    public function detail()
+    {
+        return $this->hasMany(DetailPo::class, 'id_po', 'id_po');
+    }
 }

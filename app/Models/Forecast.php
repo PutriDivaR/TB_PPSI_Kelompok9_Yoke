@@ -51,4 +51,16 @@ class Forecast extends YokeModel
     {
         return $this->hasMany(PurchaseOrder::class, 'id_forecast', 'id_forecast');
     }
+
+    // Relasi ke tabel Purchase Order (E-PO)
+    public function purchaseOrder()
+    {
+        return $this->hasOne(PurchaseOrder::class, 'id_forecast', 'id_forecast');
+    }
+
+    // Relasi ke Detail Forecast
+    public function detail()
+    {
+        return $this->hasMany(DetailForecast::class, 'id_forecast', 'id_forecast');
+    }
 }

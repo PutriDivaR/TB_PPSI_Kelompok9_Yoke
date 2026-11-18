@@ -1,0 +1,292 @@
+-- =====================================================================
+-- DATA DUMMY MODUL E-PO  |  Database: yoke_ppsi  |  MySQL 8.x
+-- Syarat: skema 23 tabel sudah dibuat dan tabel `peran` sudah terisi
+--         (Admin, Distributor, Logistik Pusat, SAM). Tabel lain masih kosong.
+-- Cara pakai: salin seluruh isi file ini ke phpMyAdmin > tab SQL > Go,
+--             atau:  mysql -u root yoke_ppsi < data_dummy_epo.txt
+-- Kata sandi semua akun dummy: password
+--
+-- Satuan: forecast & PO = KONTAINER; sell_out & stok_gudang = KARTON;
+--         produk.harga = rupiah per KARTON.
+-- Skenario setelah data masuk (tanggal sistem sekitar 18 Nov 2026):
+--   Distributor 1 PT Minang Niaga Jaya : Forecast Nov kuota sudah ditetapkan, belum ada E-PO
+--                                        -> halaman "Input E-PO" terisi (plafon 19 kontainer = 9.500 karton)
+--                                        -> periode Des 2026 masih kosong untuk "Hitung/Ajukan Forecast"
+--   Distributor 2 PT Sumber Segar       : Forecast Nov status Diajukan -> antrean penetapan kuota Logistik
+--   Distributor 3 PT Tirta Niaga Mandiri: E-PO Nov status Diajukan -> antrean verifikasi E-PO Logistik
+-- =====================================================================
+USE yoke_ppsi;
+
+INSERT INTO `wilayah` (`id_wilayah`, `nama_wilayah`) VALUES
+  (1, 'Sumatera Barat'),
+  (2, 'Sumatera Utara'),
+  (3, 'Riau');
+
+INSERT INTO `tahun_fiskal` (`id_tahun_fiskal`, `tanggal_mulai`, `tanggal_selesai`, `status`) VALUES
+  (1, '2025-01-01', '2025-12-31', 'Selesai'),
+  (2, '2026-01-01', '2026-12-31', 'Aktif');
+
+INSERT INTO `produk` (`id_produk`, `kode_sku`, `nama_produk`, `harga`, `karton_per_kontainer`, `kategori`) VALUES
+  (1, 'YFI-TM-500', 'YFI Teh Melati 500ml', 95000, 500, 'Teh'),
+  (2, 'FAN-SPK-325', 'FAN Sparkling Water 325ml', 95000, 500, 'Air Soda'),
+  (3, 'YFI-JA-330', 'YFI Jus Apel 330ml', 88000, 500, 'Jus'),
+  (4, 'YFI-ISO-330', 'YFI Isotonik Refresh 330ml', 95000, 500, 'Isotonik');
+
+INSERT INTO `distributor` (`id_distributor`, `nama`, `id_wilayah`, `kontak`, `alamat_gudang`, `nomor_mou`, `status_aktif`) VALUES
+  (1, 'PT Minang Niaga Jaya', 1, '0751-7890123', 'Jl. Raya By Pass Km. 12, Kec. Koto Tangah, Kota Padang, Sumatera Barat 25586', 'MOU-YFI-PDG-2024-001', 1),
+  (2, 'PT Sumber Segar Distribusi', 2, '061-4567890', 'Jl. Gatot Subroto No. 88, Medan, Sumatera Utara 20112', 'MOU-YFI-MDN-2024-002', 1),
+  (3, 'PT Tirta Niaga Mandiri', 3, '0761-322144', 'Jl. Soekarno-Hatta Km. 5, Pekanbaru, Riau 28284', 'MOU-YFI-PKU-2025-003', 1);
+
+INSERT INTO `pengguna` (`id_pengguna`, `nama`, `email`, `kata_sandi`, `id_peran`, `status_aktif`, `id_distributor`) VALUES
+  (1, 'Suci Nurhaliza', 'suci@yfi.co.id', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', (SELECT id_peran FROM peran WHERE nama_peran='Admin' LIMIT 1), 1, NULL),
+  (2, 'Putri Diva', 'diva@minangniaga.co.id', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', (SELECT id_peran FROM peran WHERE nama_peran='Distributor' LIMIT 1), 1, 1),
+  (3, 'Rina Marlina', 'rina@sumbersegar.co.id', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', (SELECT id_peran FROM peran WHERE nama_peran='Distributor' LIMIT 1), 1, 2),
+  (4, 'Yoga Pratama', 'yoga@tirtaniaga.co.id', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', (SELECT id_peran FROM peran WHERE nama_peran='Distributor' LIMIT 1), 1, 3),
+  (5, 'Riski Ramadhan', 'riski@yfi.co.id', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', (SELECT id_peran FROM peran WHERE nama_peran='Logistik Pusat' LIMIT 1), 1, NULL),
+  (6, 'Ahmad Fauzi', 'fauzi@yfi.co.id', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', (SELECT id_peran FROM peran WHERE nama_peran='Logistik Pusat' LIMIT 1), 1, NULL),
+  (7, 'Farhan Fitrahadi', 'farhan@yfi.co.id', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', (SELECT id_peran FROM peran WHERE nama_peran='SAM' LIMIT 1), 1, NULL);
+
+INSERT INTO `forecast` (`id_forecast`, `id_distributor`, `id_tahun_fiskal`, `periode`, `tanggal_pengajuan`, `status`, `tanggal_disetujui`, `id_penyetuju`) VALUES
+  (1, 1, 2, '2026-08-01', '2026-07-14 10:12:00', 'Disetujui', '2026-07-16 09:30:00', 5),
+  (2, 1, 2, '2026-09-01', '2026-08-12 09:40:00', 'Disetujui', '2026-08-14 11:05:00', 5),
+  (3, 1, 2, '2026-10-01', '2026-09-14 10:12:00', 'Disetujui', '2026-09-16 13:20:00', 5),
+  (4, 1, 2, '2026-11-01', '2026-10-27 09:05:00', 'Disetujui', '2026-10-28 14:20:00', 5),
+  (5, 2, 2, '2026-09-01', '2026-08-12 13:00:00', 'Disetujui', '2026-08-14 15:00:00', 5),
+  (6, 2, 2, '2026-10-01', '2026-09-14 13:00:00', 'Disetujui', '2026-09-16 15:00:00', 5),
+  (7, 2, 2, '2026-11-01', '2026-10-27 15:30:00', 'Diajukan', NULL, NULL),
+  (8, 3, 2, '2026-09-01', '2026-08-13 08:50:00', 'Disetujui', '2026-08-14 16:00:00', 5),
+  (9, 3, 2, '2026-10-01', '2026-09-15 08:50:00', 'Disetujui', '2026-09-16 16:00:00', 5),
+  (10, 3, 2, '2026-11-01', '2026-10-27 11:20:00', 'Disetujui', '2026-10-28 16:10:00', 5);
+
+INSERT INTO `detail_forecast` (`id_forecast`, `id_produk`, `jumlah_kontainer`, `jumlah_disetujui`) VALUES
+  (1, 1, 5, 5),
+  (1, 2, 5, 5),
+  (1, 3, 5, 5),
+  (1, 4, 3, 3),
+  (2, 1, 6, 6),
+  (2, 2, 5, 5),
+  (2, 3, 5, 5),
+  (2, 4, 3, 3),
+  (3, 1, 6, 6),
+  (3, 2, 5, 5),
+  (3, 3, 5, 5),
+  (3, 4, 3, 3),
+  (4, 1, 6, 6),
+  (4, 2, 6, 5),
+  (4, 3, 5, 5),
+  (4, 4, 3, 3),
+  (5, 1, 7, 7),
+  (5, 2, 6, 6),
+  (5, 3, 6, 6),
+  (5, 4, 4, 4),
+  (6, 1, 7, 7),
+  (6, 2, 6, 6),
+  (6, 3, 6, 6),
+  (6, 4, 4, 4),
+  (7, 1, 8, NULL),
+  (7, 2, 7, NULL),
+  (7, 3, 6, NULL),
+  (7, 4, 4, NULL),
+  (8, 1, 5, 5),
+  (8, 2, 4, 4),
+  (8, 3, 4, 4),
+  (8, 4, 2, 2),
+  (9, 1, 5, 5),
+  (9, 2, 4, 4),
+  (9, 3, 4, 4),
+  (9, 4, 2, 2),
+  (10, 1, 5, 5),
+  (10, 2, 5, 4),
+  (10, 3, 4, 4),
+  (10, 4, 2, 2);
+
+INSERT INTO `purchase_order` (`id_po`, `nomor_po`, `id_forecast`, `tanggal_pengajuan`, `status`, `tanggal_disetujui`, `id_penyetuju`) VALUES
+  (1, 'PO-YFI-2026-0041', 1, '2026-07-20 10:00:00', 'Disetujui', '2026-07-21 14:00:00', 5),
+  (2, 'PO-YFI-2026-0057', 2, '2026-08-18 10:00:00', 'Disetujui', '2026-08-19 14:00:00', 5),
+  (3, 'PO-YFI-2026-0073', 3, '2026-09-22 10:00:00', 'Disetujui', '2026-09-23 14:00:00', 5),
+  (4, 'PO-YFI-2026-0058', 5, '2026-08-19 09:00:00', 'Disetujui', '2026-08-20 10:30:00', 5),
+  (5, 'PO-YFI-2026-0074', 6, '2026-09-23 09:00:00', 'Disetujui', '2026-09-24 10:30:00', 5),
+  (6, 'PO-YFI-2026-0059', 8, '2026-08-19 11:00:00', 'Disetujui', '2026-08-20 13:00:00', 5),
+  (7, 'PO-YFI-2026-0075', 9, '2026-09-24 11:00:00', 'Disetujui', '2026-09-25 13:00:00', 5),
+  (8, 'PO-YFI-2026-0089', 10, '2026-10-29 10:42:00', 'Diajukan', NULL, NULL);
+
+INSERT INTO `detail_po` (`id_po`, `id_produk`, `jumlah_kontainer`) VALUES
+  (1, 1, 5),
+  (1, 2, 5),
+  (1, 3, 5),
+  (1, 4, 3),
+  (2, 1, 6),
+  (2, 2, 5),
+  (2, 3, 5),
+  (2, 4, 3),
+  (3, 1, 6),
+  (3, 2, 5),
+  (3, 3, 5),
+  (3, 4, 3),
+  (4, 1, 7),
+  (4, 2, 6),
+  (4, 3, 6),
+  (4, 4, 4),
+  (5, 1, 7),
+  (5, 2, 6),
+  (5, 3, 6),
+  (5, 4, 4),
+  (6, 1, 5),
+  (6, 2, 4),
+  (6, 3, 4),
+  (6, 4, 2),
+  (7, 1, 5),
+  (7, 2, 4),
+  (7, 3, 4),
+  (7, 4, 2),
+  (8, 1, 5),
+  (8, 2, 4),
+  (8, 3, 4),
+  (8, 4, 2);
+
+INSERT INTO `sell_out` (`id_distributor`, `id_produk`, `kanal`, `jumlah`, `tanggal`) VALUES
+  (1, 1, 'Toko Modern', 1450, '2026-08-09'),
+  (1, 1, 'Grosir', 870, '2026-08-18'),
+  (1, 1, 'Horeca', 580, '2026-08-27'),
+  (1, 1, 'Toko Modern', 1500, '2026-09-09'),
+  (1, 1, 'Grosir', 900, '2026-09-18'),
+  (1, 1, 'Horeca', 600, '2026-09-27'),
+  (1, 1, 'Toko Modern', 1550, '2026-10-09'),
+  (1, 1, 'Grosir', 930, '2026-10-18'),
+  (1, 1, 'Horeca', 620, '2026-10-27'),
+  (1, 2, 'Toko Modern', 1250, '2026-08-09'),
+  (1, 2, 'Grosir', 750, '2026-08-18'),
+  (1, 2, 'Horeca', 500, '2026-08-27'),
+  (1, 2, 'Toko Modern', 1300, '2026-09-09'),
+  (1, 2, 'Grosir', 780, '2026-09-18'),
+  (1, 2, 'Horeca', 520, '2026-09-27'),
+  (1, 2, 'Toko Modern', 1350, '2026-10-09'),
+  (1, 2, 'Grosir', 810, '2026-10-18'),
+  (1, 2, 'Horeca', 540, '2026-10-27'),
+  (1, 3, 'Toko Modern', 1200, '2026-08-09'),
+  (1, 3, 'Grosir', 720, '2026-08-18'),
+  (1, 3, 'Horeca', 480, '2026-08-27'),
+  (1, 3, 'Toko Modern', 1250, '2026-09-09'),
+  (1, 3, 'Grosir', 750, '2026-09-18'),
+  (1, 3, 'Horeca', 500, '2026-09-27'),
+  (1, 3, 'Toko Modern', 1300, '2026-10-09'),
+  (1, 3, 'Grosir', 780, '2026-10-18'),
+  (1, 3, 'Horeca', 520, '2026-10-27'),
+  (1, 4, 'Toko Modern', 750, '2026-08-09'),
+  (1, 4, 'Grosir', 450, '2026-08-18'),
+  (1, 4, 'Horeca', 300, '2026-08-27'),
+  (1, 4, 'Toko Modern', 800, '2026-09-09'),
+  (1, 4, 'Grosir', 480, '2026-09-18'),
+  (1, 4, 'Horeca', 320, '2026-09-27'),
+  (1, 4, 'Toko Modern', 850, '2026-10-09'),
+  (1, 4, 'Grosir', 510, '2026-10-18'),
+  (1, 4, 'Horeca', 340, '2026-10-27'),
+  (2, 1, 'Toko Modern', 2030, '2026-08-09'),
+  (2, 1, 'Grosir', 1218, '2026-08-18'),
+  (2, 1, 'Horeca', 812, '2026-08-27'),
+  (2, 1, 'Toko Modern', 2100, '2026-09-09'),
+  (2, 1, 'Grosir', 1260, '2026-09-18'),
+  (2, 1, 'Horeca', 840, '2026-09-27'),
+  (2, 1, 'Toko Modern', 2170, '2026-10-09'),
+  (2, 1, 'Grosir', 1302, '2026-10-18'),
+  (2, 1, 'Horeca', 868, '2026-10-27'),
+  (2, 2, 'Toko Modern', 1750, '2026-08-09'),
+  (2, 2, 'Grosir', 1050, '2026-08-18'),
+  (2, 2, 'Horeca', 700, '2026-08-27'),
+  (2, 2, 'Toko Modern', 1820, '2026-09-09'),
+  (2, 2, 'Grosir', 1092, '2026-09-18'),
+  (2, 2, 'Horeca', 728, '2026-09-27'),
+  (2, 2, 'Toko Modern', 1890, '2026-10-09'),
+  (2, 2, 'Grosir', 1134, '2026-10-18'),
+  (2, 2, 'Horeca', 756, '2026-10-27'),
+  (2, 3, 'Toko Modern', 1680, '2026-08-09'),
+  (2, 3, 'Grosir', 1008, '2026-08-18'),
+  (2, 3, 'Horeca', 672, '2026-08-27'),
+  (2, 3, 'Toko Modern', 1750, '2026-09-09'),
+  (2, 3, 'Grosir', 1050, '2026-09-18'),
+  (2, 3, 'Horeca', 700, '2026-09-27'),
+  (2, 3, 'Toko Modern', 1820, '2026-10-09'),
+  (2, 3, 'Grosir', 1092, '2026-10-18'),
+  (2, 3, 'Horeca', 728, '2026-10-27'),
+  (2, 4, 'Toko Modern', 1050, '2026-08-09'),
+  (2, 4, 'Grosir', 630, '2026-08-18'),
+  (2, 4, 'Horeca', 420, '2026-08-27'),
+  (2, 4, 'Toko Modern', 1120, '2026-09-09'),
+  (2, 4, 'Grosir', 672, '2026-09-18'),
+  (2, 4, 'Horeca', 448, '2026-09-27'),
+  (2, 4, 'Toko Modern', 1190, '2026-10-09'),
+  (2, 4, 'Grosir', 714, '2026-10-18'),
+  (2, 4, 'Horeca', 476, '2026-10-27'),
+  (3, 1, 'Toko Modern', 1160, '2026-08-09'),
+  (3, 1, 'Grosir', 696, '2026-08-18'),
+  (3, 1, 'Horeca', 464, '2026-08-27'),
+  (3, 1, 'Toko Modern', 1200, '2026-09-09'),
+  (3, 1, 'Grosir', 720, '2026-09-18'),
+  (3, 1, 'Horeca', 480, '2026-09-27'),
+  (3, 1, 'Toko Modern', 1240, '2026-10-09'),
+  (3, 1, 'Grosir', 744, '2026-10-18'),
+  (3, 1, 'Horeca', 496, '2026-10-27'),
+  (3, 2, 'Toko Modern', 1000, '2026-08-09'),
+  (3, 2, 'Grosir', 600, '2026-08-18'),
+  (3, 2, 'Horeca', 400, '2026-08-27'),
+  (3, 2, 'Toko Modern', 1040, '2026-09-09'),
+  (3, 2, 'Grosir', 624, '2026-09-18'),
+  (3, 2, 'Horeca', 416, '2026-09-27'),
+  (3, 2, 'Toko Modern', 1080, '2026-10-09'),
+  (3, 2, 'Grosir', 648, '2026-10-18'),
+  (3, 2, 'Horeca', 432, '2026-10-27'),
+  (3, 3, 'Toko Modern', 960, '2026-08-09'),
+  (3, 3, 'Grosir', 576, '2026-08-18'),
+  (3, 3, 'Horeca', 384, '2026-08-27'),
+  (3, 3, 'Toko Modern', 1000, '2026-09-09'),
+  (3, 3, 'Grosir', 600, '2026-09-18'),
+  (3, 3, 'Horeca', 400, '2026-09-27'),
+  (3, 3, 'Toko Modern', 1040, '2026-10-09'),
+  (3, 3, 'Grosir', 624, '2026-10-18'),
+  (3, 3, 'Horeca', 416, '2026-10-27'),
+  (3, 4, 'Toko Modern', 600, '2026-08-09'),
+  (3, 4, 'Grosir', 360, '2026-08-18'),
+  (3, 4, 'Horeca', 240, '2026-08-27'),
+  (3, 4, 'Toko Modern', 640, '2026-09-09'),
+  (3, 4, 'Grosir', 384, '2026-09-18'),
+  (3, 4, 'Horeca', 256, '2026-09-27'),
+  (3, 4, 'Toko Modern', 680, '2026-10-09'),
+  (3, 4, 'Grosir', 408, '2026-10-18'),
+  (3, 4, 'Horeca', 272, '2026-10-27');
+
+INSERT INTO `stok_gudang` (`id_distributor`, `id_produk`, `periode`, `stok_fisik`, `stok_layak_jual`) VALUES
+  (1, 1, '2026-10-31', 540, 500),
+  (1, 2, '2026-10-31', 640, 600),
+  (1, 3, '2026-10-31', 440, 400),
+  (1, 4, '2026-10-31', 340, 300),
+  (2, 1, '2026-10-31', 740, 700),
+  (2, 2, '2026-10-31', 880, 840),
+  (2, 3, '2026-10-31', 600, 560),
+  (2, 4, '2026-10-31', 460, 420),
+  (3, 1, '2026-10-31', 440, 400),
+  (3, 2, '2026-10-31', 520, 480),
+  (3, 3, '2026-10-31', 360, 320),
+  (3, 4, '2026-10-31', 280, 240);
+
+INSERT INTO `log_aktivitas` (`id_pengguna`, `modul`, `aksi`, `waktu`) VALUES
+  (2, 'E-PO', 'Ajukan forecast 2026-11', '2026-10-27 09:05:00'),
+  (5, 'E-PO', 'Tetapkan kuota forecast #4', '2026-10-28 14:20:00'),
+  (3, 'E-PO', 'Ajukan forecast 2026-11', '2026-10-27 15:30:00'),
+  (4, 'E-PO', 'Kirim E-PO PO-YFI-2026-0089', '2026-10-29 10:42:00');
+
+-- ---------------------------------------------------------------------
+-- CEK CEPAT (opsional): jumlah baris per tabel yang diisi
+-- ---------------------------------------------------------------------
+SELECT 'forecast' t, COUNT(*) n FROM forecast UNION ALL SELECT 'detail_forecast', COUNT(*) FROM detail_forecast
+UNION ALL SELECT 'purchase_order', COUNT(*) FROM purchase_order UNION ALL SELECT 'detail_po', COUNT(*) FROM detail_po
+UNION ALL SELECT 'sell_out', COUNT(*) FROM sell_out UNION ALL SELECT 'stok_gudang', COUNT(*) FROM stok_gudang;
+
+-- ---------------------------------------------------------------------
+-- RESET (opsional, JANGAN dijalankan bila tabel sudah berisi data asli).
+-- Hapus tanda komentar bila ingin mengisi ulang data dummy dari nol.
+-- ---------------------------------------------------------------------
+-- SET FOREIGN_KEY_CHECKS = 0;
+-- DELETE FROM detail_po; DELETE FROM purchase_order; DELETE FROM detail_forecast; DELETE FROM forecast;
+-- DELETE FROM sell_out; DELETE FROM stok_gudang; DELETE FROM log_aktivitas;
+-- DELETE FROM pengguna; DELETE FROM distributor; DELETE FROM produk; DELETE FROM tahun_fiskal; DELETE FROM wilayah;
+-- SET FOREIGN_KEY_CHECKS = 1;
