@@ -1,6 +1,7 @@
-@extends('layouts.admin')
+@extends('layouts.app')
 
 @section('title', 'Log Aktivitas (Audit Trail)')
+@section('module_title', 'Master Data & Admin')
 
 @section('content')
 <div x-data="{

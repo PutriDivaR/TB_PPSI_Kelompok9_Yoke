@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal Admin - PT Yoke Food Industries Indonesia</title>
+    <title>WAYPOINT - Master Data & Admin - PT Yoke Food Industries Indonesia</title>
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,12 +12,9 @@
             theme: {
                 extend: {
                     colors: {
-                        admin: {
-                            navy: '#0B132B',
-                            slate: '#1E293B',
-                            bg: '#EFF5F9',
+                        brand: {
                             red: '#DC2626',
-                            green: '#047857'
+                            dark: '#1E293B'
                         }
                     },
                     fontFamily: {
@@ -46,12 +43,25 @@
         [x-cloak] { display: none !important; }
         body { font-family: 'Inter', sans-serif; }
     </style>
-</head>
-<body class="bg-[#EFF5F9] text-slate-800 antialiased min-h-screen flex"
-      x-data="{
+
+    <!-- Alpine Component State & Controller -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('adminPortal', () => ({
+          sidebarOpen: window.innerWidth >= 1024,
+          openRole: false,
           activeTab: 'ringkasan',
           showLogoutModal: false,
           toasts: [],
+
+          tabTitles: {
+              'ringkasan': 'Dashboard Admin',
+              'pengguna': 'Kelola Pengguna & Hak Akses',
+              'distributor': 'Data Master Distributor',
+              'produk': 'Data Master Produk (SKU)',
+              'tahun-fiskal': 'Periode Tahun Fiskal',
+              'log-aktivitas': 'Log Aktivitas (Audit Trail)'
+          },
 
           // Central Data Store
           users: [],
@@ -198,7 +208,7 @@
           },
           deleteUser(user) {
               if (user.peran === 'Admin') {
-                  this.addToast('Akun Administrator tidak dapat dihapus.', 'error');
+                  this.addToast('Akun Administrator tidak dapat dihapus demi keamanan.', 'error');
                   return;
               }
               if (confirm(`Hapus pengguna ${user.nama}?`)) {
@@ -210,7 +220,7 @@
           },
           togglePermission(perm, roleKey) {
               if (roleKey === 'admin') {
-                  this.addToast('Hak akses Admin dikunci untuk menjaga keamanan sistem.', 'error');
+                  this.addToast('Hak akses Admin dikunci untuk menjaga integritas sistem.', 'error');
                   return;
               }
               perm[roleKey] = !perm[roleKey];
@@ -242,7 +252,7 @@
               this.distributors.push(newDist);
               adminStore.save('distributors', this.distributors);
               adminStore.logActivity('Tambah', 'Master Distributor', `Menambahkan ${newDist.nama} (${newDist.wilayah})`);
-              this.addToast(`Distributor ${newDist.nama} berhasil ditambahkan.`, 'success');
+              this.addToast(`Distributor ${newDist.nama} berhasil didaftarkan.`, 'success');
               this.showDistForm = false;
               this.distFormData = { nama: '', kontak: '', telepon: '', wilayah: 'Sumbar' };
           },
@@ -354,7 +364,7 @@
               const headers = ['Waktu', 'Pengguna', 'Peran', 'Aksi', 'Modul', 'Keterangan', 'Alamat IP'];
               const rows = [headers.join(',')];
               this.filteredLogs.forEach(l => {
-                  rows.push([`&quot;${l.waktu}&quot;`, `&quot;${l.pengguna}&quot;`, `&quot;${l.peran}&quot;`, `&quot;${l.aksi}&quot;`, `&quot;${l.modul}&quot;`, `&quot;${l.keterangan}&quot;`, `&quot;${l.ip}&quot;`].join(','));
+                  rows.push([`"${l.waktu}"`, `"${l.pengguna}"`, `"${l.peran}"`, `"${l.aksi}"`, `"${l.modul}"`, `"${l.keterangan}"`, `"${l.ip}"`].join(','));
               });
               const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
               const url = URL.createObjectURL(blob);
@@ -365,883 +375,940 @@
               adminStore.logActivity('Ekspor', 'Log Aktivitas', `Mengekspor log 1–23 Okt 2026`);
               this.addToast('Log aktivitas berhasil diekspor ke file CSV.', 'success');
           }
-      }"
-      x-init="init()"
+        }));
+    });
+</script>
+
+</head>
+<body class="bg-slate-100/80 font-sans antialiased text-slate-800"
+      x-data="adminPortal"
       @show-toast.window="addToast($event.detail.message, $event.detail.type)">
 
-    <!-- Sidebar Navigation Sesuai Dokumen -->
-    <aside class="w-64 bg-[#0B132B] text-slate-300 flex-shrink-0 flex flex-col justify-between min-h-screen border-r border-slate-800/80 select-none">
-        <div>
-            <!-- Header Brand -->
-            <div class="p-6 pb-5 flex items-center space-x-3.5">
-                <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white text-lg shadow-md shadow-red-950/40">
-                    <i class="fa-solid fa-shield-halved"></i>
-                </div>
-                <div>
-                    <h1 class="text-white font-bold text-sm leading-tight tracking-wide">Portal Admin</h1>
-                    <p class="text-[11px] text-slate-400 font-medium">Administrator Sistem</p>
-                </div>
-            </div>
+    <div class="min-h-screen flex flex-col">
 
-            <!-- Menus -->
-            <nav class="px-4 py-2 space-y-6 text-xs">
-                <!-- Ringkasan -->
-                <div>
-                    <button @click="activeTab = 'ringkasan'" 
-                            type="button"
-                            class="w-full flex items-center space-x-3 px-4 py-3 rounded-2xl font-semibold transition-all duration-150"
-                            :class="activeTab === 'ringkasan' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
-                        <i class="fa-solid fa-table-cells-large text-sm w-4 text-center"></i>
-                        <span class="text-[13px]">Ringkasan</span>
-                    </button>
-                </div>
-
-                <!-- MASTER DATA -->
-                <div>
-                    <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-widest px-4 mb-2">
-                        MASTER DATA
-                    </div>
-                    <div class="space-y-1">
-                        <!-- Pengguna & Hak Akses -->
-                        <button @click="activeTab = 'pengguna'" 
-                                type="button"
-                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
-                                :class="activeTab === 'pengguna' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
-                            <i class="fa-solid fa-users text-sm w-4 text-center"></i>
-                            <span class="text-[12.5px]">Pengguna & Hak Akses</span>
-                        </button>
-
-                        <!-- Data Distributor -->
-                        <button @click="activeTab = 'distributor'" 
-                                type="button"
-                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
-                                :class="activeTab === 'distributor' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
-                            <i class="fa-solid fa-store text-sm w-4 text-center"></i>
-                            <span class="text-[12.5px]">Data Distributor</span>
-                        </button>
-
-                        <!-- Data Produk (SKU) -->
-                        <button @click="activeTab = 'produk'" 
-                                type="button"
-                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
-                                :class="activeTab === 'produk' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
-                            <i class="fa-solid fa-cube text-sm w-4 text-center"></i>
-                            <span class="text-[12.5px]">Data Produk (SKU)</span>
-                        </button>
-
-                        <!-- Periode Tahun Fiskal -->
-                        <button @click="activeTab = 'tahun-fiskal'" 
-                                type="button"
-                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
-                                :class="activeTab === 'tahun-fiskal' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
-                            <i class="fa-solid fa-calendar-days text-sm w-4 text-center"></i>
-                            <span class="text-[12.5px]">Periode Tahun Fiskal</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- PENGAWASAN -->
-                <div>
-                    <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-widest px-4 mb-2">
-                        PENGAWASAN
-                    </div>
-                    <div class="space-y-1">
-                        <!-- Log Aktivitas -->
-                        <button @click="activeTab = 'log-aktivitas'" 
-                                type="button"
-                                class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-2xl font-medium transition-all duration-150"
-                                :class="activeTab === 'log-aktivitas' ? 'bg-red-600 text-white shadow-md shadow-red-950/40' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'">
-                            <i class="fa-solid fa-file-lines text-sm w-4 text-center"></i>
-                            <span class="text-[12.5px]">Log Aktivitas</span>
-                        </button>
-                    </div>
-                </div>
-            </nav>
-        </div>
-
-        <!-- Bottom User Card -->
-        <div class="p-4 border-t border-slate-800/80">
-            <div class="bg-[#121B35] rounded-2xl p-3 border border-slate-700/50">
-                <div class="flex items-center space-x-3">
-                    <div class="w-9 h-9 bg-red-600 text-white rounded-xl flex items-center justify-center font-bold text-xs tracking-wider shadow-sm">
-                        RW
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-xs font-bold text-white truncate">Rina Wulandari</p>
-                        <p class="text-[11px] text-slate-400 truncate">Admin</p>
-                    </div>
-                </div>
-                
-                <button @click="showLogoutModal = true" 
-                        type="button"
-                        class="mt-3 w-full bg-[#0B132B] hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold py-2 rounded-xl transition text-center flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-arrow-right-from-bracket text-[11px]"></i>
-                    <span>Keluar</span>
+        <!-- =================== HEADER ATAS (PERSIS header.blade.php) =================== -->
+        <header :class="sidebarOpen ? 'left-64' : 'left-0'" 
+                class="bg-white border-b border-slate-200 h-16 fixed top-0 right-0 z-30 flex items-center justify-between px-6 transition-all duration-300">
+            
+            <div class="flex items-center">
+                <!-- Hamburger Button Toggle Sidebar -->
+                <button type="button" @click="sidebarOpen = !sidebarOpen" 
+                        class="mr-3 rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 transition" 
+                        aria-label="Buka atau tutup menu">
+                    <i class="fa-solid fa-bars"></i>
                 </button>
-            </div>
-        </div>
-    </aside>
 
-    <!-- Main Workspace Area -->
-    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto min-h-screen p-8 lg:p-10">
-        
-        <!-- Quick Control Bar -->
-        <div class="mb-5 flex items-center justify-between text-xs text-slate-400">
-            <div class="flex items-center space-x-2">
-                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="font-medium text-slate-500">Live Mock Data Store &middot; PT Yoke Food Industries Indonesia</span>
+                <!-- Left: Breadcrumbs -->
+                <div class="hidden min-w-0 flex-1 items-center space-x-3 text-xs font-medium text-slate-500 lg:flex">
+                    <span class="text-slate-400">WAYPOINT</span>
+                    <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+                    <span class="text-slate-700 font-bold uppercase tracking-wider">ADMIN</span>
+                    <i class="fa-solid fa-chevron-right text-[9px] text-slate-300"></i>
+                    <span class="text-red-600 font-bold" x-text="tabTitles[activeTab] || 'Master Data & Admin'"></span>
+                </div>
             </div>
-            <div class="flex items-center space-x-3">
-                <button @click="if(confirm('Kembalikan seluruh data ke awal?')) adminStore.resetAll()" 
+
+            <!-- Right: Simulator Role Switcher Dropdown & User Profile -->
+            <div class="flex items-center space-x-4">
+
+                <!-- Reset Demo Data Shortcut Button -->
+                <button @click="if(confirm('Kembalikan seluruh data ke awal sampel dokumen?')) adminStore.resetAll()" 
                         type="button" 
-                        class="hover:text-red-600 transition flex items-center space-x-1.5 px-3 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs font-medium text-slate-600">
+                        class="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white text-xs font-medium text-slate-600 hover:text-red-600 transition shadow-2xs">
                     <i class="fa-solid fa-rotate-left text-[10px]"></i>
                     <span>Reset Data Dummy</span>
                 </button>
-            </div>
-        </div>
 
-        <!-- =================== TAB 1: RINGKASAN =================== -->
-        <div x-show="activeTab === 'ringkasan'" class="space-y-6">
-            <div>
-                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                    RINGKASAN
-                </div>
-                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
-                    Selamat datang, Rina
-                </h1>
-                <p class="text-sm text-slate-500 font-normal mt-1">
-                    Pantau kondisi master data dan aktivitas pengguna sistem.
-                </p>
-            </div>
-
-            <!-- 4 Stats Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
-                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PENGGUNA AKTIF</div>
-                    <div class="mt-2 text-4xl font-black text-slate-900" x-text="activeUsersCount">7</div>
-                    <div class="mt-1 text-xs text-slate-500">dari <span x-text="users.length">8</span> akun terdaftar</div>
-                </div>
-
-                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
-                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">DISTRIBUTOR</div>
-                    <div class="mt-2 text-4xl font-black text-slate-900" x-text="distributors.length">6</div>
-                    <div class="mt-1 text-xs text-slate-500">Sumbar <span x-text="sumbarDistCount">3</span> · Riau <span x-text="riauDistCount">3</span></div>
-                </div>
-
-                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
-                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PRODUK (SKU)</div>
-                    <div class="mt-2 text-4xl font-black text-slate-900" x-text="products.length">3</div>
-                    <div class="mt-1 text-xs text-slate-500">katalog master aktif</div>
-                </div>
-
-                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
-                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">TAHUN FISKAL</div>
-                    <div class="mt-2 text-3xl font-black text-slate-900 tracking-tight" x-text="activePeriod?.tahun || '2026/2027'">2026/2027</div>
-                    <div class="mt-1 text-xs text-slate-500">hari ke-23 dari 365</div>
-                </div>
-            </div>
-
-            <!-- Middle Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Pengguna per peran -->
-                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
-                    <h2 class="text-base font-bold text-slate-900 tracking-tight mb-5">Pengguna per peran</h2>
-                    <div class="space-y-4 text-xs font-medium">
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <span class="font-bold text-slate-900">Admin</span>
-                                <span class="text-slate-500" x-text="roleCounts['Admin'] + ' akun'">1 akun</span>
-                            </div>
-                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div class="bg-red-600 h-2 rounded-full" :style="`width: ${(roleCounts['Admin'] / users.length) * 100}%`"></div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <span class="font-bold text-slate-900">Distributor</span>
-                                <span class="text-slate-500" x-text="roleCounts['Distributor'] + ' akun'">3 akun</span>
-                            </div>
-                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div class="bg-emerald-600 h-2 rounded-full" :style="`width: ${(roleCounts['Distributor'] / users.length) * 100}%`"></div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <span class="font-bold text-slate-900">Logistik Pusat</span>
-                                <span class="text-slate-500" x-text="roleCounts['Logistik Pusat'] + ' akun'">2 akun</span>
-                            </div>
-                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div class="bg-[#0B132B] h-2 rounded-full" :style="`width: ${(roleCounts['Logistik Pusat'] / users.length) * 100}%`"></div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <span class="font-bold text-slate-900">SAM</span>
-                                <span class="text-slate-500" x-text="roleCounts['SAM'] + ' akun'">2 akun</span>
-                            </div>
-                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div class="bg-[#0B132B] h-2 rounded-full" :style="`width: ${(roleCounts['SAM'] / users.length) * 100}%`"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Aksi Cepat -->
-                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
-                    <h2 class="text-base font-bold text-slate-900 tracking-tight mb-5">Aksi cepat</h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
-                        <button @click="activeTab = 'pengguna'; openCreateUser()" 
-                                class="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
-                            Tambah pengguna
-                        </button>
-                        <button @click="activeTab = 'distributor'; showDistForm = true" 
-                                class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
-                            Tambah distributor
-                        </button>
-                        <button @click="activeTab = 'produk'; showProductForm = true" 
-                                class="bg-[#0B132B] hover:bg-slate-900 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
-                            Tambah produk
-                        </button>
-                        <button @click="activeTab = 'tahun-fiskal'" 
-                                class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-2xs transition">
-                            Atur tahun fiskal
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Aktivitas Terbaru -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
-                <div class="flex items-center justify-between mb-5">
-                    <h2 class="text-base font-bold text-slate-900 tracking-tight">Aktivitas terbaru</h2>
-                    <button @click="activeTab = 'log-aktivitas'" 
-                            class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-xl transition">
-                        Lihat semua log
+                <!-- DROPDOWN GANTI AKTOR / ROLE (PERSIS header.blade.php) -->
+                <div class="relative" x-data="{ openRole: false }">
+                    <button @click="openRole = !openRole" 
+                            class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 transition">
+                        <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                        <span class="uppercase tracking-wider">Simulasi Aktor: admin</span>
+                        <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
                     </button>
+
+                    <div x-show="openRole" @click.away="openRole = false" 
+                         class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 text-xs z-50" style="display: none;">
+                        <div class="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+                            Pilih Aktor Pengguna:
+                        </div>
+                        
+                        <a href="/distributor" class="flex items-center justify-between px-3 py-2 hover:bg-slate-50 text-slate-600">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span>Distributor (Diva)</span>
+                            </div>
+                        </a>
+
+                        <a href="/logistik" class="flex items-center justify-between px-3 py-2 hover:bg-slate-50 text-slate-600">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span>Logistik Pusat (Fauzi)</span>
+                            </div>
+                        </a>
+
+                        <a href="/sam" class="flex items-center justify-between px-3 py-2 hover:bg-slate-50 text-slate-600">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                <span>SAM (Taufik)</span>
+                            </div>
+                        </a>
+
+                        <div class="flex items-center justify-between px-3 py-2 bg-slate-100 font-bold text-slate-900">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                                <span>Admin (Suci)</span>
+                            </div>
+                            <i class="fa-solid fa-check text-purple-600"></i>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="divide-y divide-slate-100">
-                    <template x-for="log in logs.slice(0, 5)" :key="log.id">
-                        <div class="py-3.5 flex items-center justify-between text-xs">
-                            <div class="flex items-center space-x-3 min-w-0 pr-4">
-                                <span class="px-2.5 py-1 rounded-md font-bold text-[11px] text-white flex-shrink-0"
-                                      :class="{
-                                          'bg-[#0B132B]': log.aksi === 'Ubah' || log.aksi === 'Login' || log.aksi === 'Ekspor',
-                                          'bg-emerald-600': log.aksi === 'Tambah',
-                                          'bg-red-600': log.aksi === 'Hapus'
-                                      }"
-                                      x-text="log.aksi"></span>
-                                <div class="truncate text-slate-700">
-                                    <span class="font-bold text-slate-900" x-text="log.pengguna"></span>
-                                    <span class="text-slate-400 mx-1">&middot;</span>
-                                    <span x-text="log.keterangan"></span>
+                <div class="h-6 w-[1px] bg-slate-200"></div>
+
+                <!-- User Profile Info -->
+                <div class="flex items-center space-x-3">
+                    <div class="text-right hidden sm:block">
+                        <div class="text-xs font-bold text-slate-800">Suci Nurhaliza (Admin)</div>
+                        <div class="text-[10px] text-slate-400">System Administrator</div>
+                    </div>
+                    <img class="w-8 h-8 rounded-full border border-slate-300 shadow-xs" 
+                         src="https://ui-avatars.com/api/?name=Suci+Nurhaliza&background=1E293B&color=fff" alt="Avatar">
+                </div>
+
+            </div>
+        </header>
+
+        <div class="flex flex-1 pt-16">
+
+            <!-- =================== SIDEBAR (PERSIS sidebar.blade.php) =================== -->
+            <aside x-show="sidebarOpen" 
+                   class="w-64 bg-[#1E293B] text-slate-300 fixed left-0 top-0 bottom-0 z-40 overflow-y-auto flex flex-col justify-between select-none">
+                
+                <div>
+                    <!-- Logo Header WAYPOINT (PERSIS sidebar.blade.php) -->
+                    <div class="p-5 border-b border-slate-700/60 flex flex-col items-center text-center">
+                        <div class="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center text-white font-black text-xl shadow-lg mb-2">
+                            yfi
+                        </div>
+                        <span class="text-white font-bold tracking-wider text-sm">WAYPOINT</span>
+                        <span class="text-[10px] text-slate-400 font-medium">PT Yoke Food Industries Indonesia</span>
+                    </div>
+
+                    <!-- Navigation items (PERSIS sidebar.blade.php) -->
+                    <nav class="p-4 space-y-5 text-xs">
+                        
+                        <!-- Dashboard (Semua Aktor / Utama) -->
+                        <div>
+                            <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Utama</div>
+                            <button type="button" @click="activeTab = 'ringkasan'" 
+                                    class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition"
+                                    :class="activeTab === 'ringkasan' ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300'">
+                                <i class="fa-solid fa-chart-line w-4" :class="activeTab === 'ringkasan' ? 'text-red-500' : 'text-slate-400'"></i>
+                                <span>Dashboard Admin</span>
+                            </button>
+                        </div>
+
+                        <!-- MENU ADMIN -->
+                        <div>
+                            <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Master Data & Admin</div>
+                            <div class="space-y-1">
+                                <!-- Kelola Pengguna -->
+                                <button type="button" @click="activeTab = 'pengguna'" 
+                                        class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition"
+                                        :class="activeTab === 'pengguna' ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300'">
+                                    <i class="fa-solid fa-users w-4" :class="activeTab === 'pengguna' ? 'text-red-500' : 'text-slate-400'"></i>
+                                    <span>Kelola Pengguna</span>
+                                </button>
+
+                                <!-- Data Distributor -->
+                                <button type="button" @click="activeTab = 'distributor'" 
+                                        class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition"
+                                        :class="activeTab === 'distributor' ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300'">
+                                    <i class="fa-solid fa-store w-4" :class="activeTab === 'distributor' ? 'text-red-500' : 'text-slate-400'"></i>
+                                    <span>Data Distributor</span>
+                                </button>
+
+                                <!-- Data Produk (SKU) -->
+                                <button type="button" @click="activeTab = 'produk'" 
+                                        class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition"
+                                        :class="activeTab === 'produk' ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300'">
+                                    <i class="fa-solid fa-cube w-4" :class="activeTab === 'produk' ? 'text-red-500' : 'text-slate-400'"></i>
+                                    <span>Data Produk (SKU)</span>
+                                </button>
+
+                                <!-- Periode Tahun Fiskal -->
+                                <button type="button" @click="activeTab = 'tahun-fiskal'" 
+                                        class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition"
+                                        :class="activeTab === 'tahun-fiskal' ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300'">
+                                    <i class="fa-solid fa-calendar-days w-4" :class="activeTab === 'tahun-fiskal' ? 'text-red-500' : 'text-slate-400'"></i>
+                                    <span>Periode Tahun Fiskal</span>
+                                </button>
+
+                                <!-- Log Aktivitas -->
+                                <button type="button" @click="activeTab = 'log-aktivitas'" 
+                                        class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition"
+                                        :class="activeTab === 'log-aktivitas' ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300'">
+                                    <i class="fa-solid fa-file-lines w-4" :class="activeTab === 'log-aktivitas' ? 'text-red-500' : 'text-slate-400'"></i>
+                                    <span>Log Aktivitas</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- LAPORAN -->
+                        <div>
+                            <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Laporan</div>
+                            <div class="space-y-1">
+                                <a href="/pelaporan" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300 transition">
+                                    <i class="fa-solid fa-chart-column w-4 text-slate-400"></i>
+                                    <span>Pelaporan & Stok (MySQL)</span>
+                                </a>
+                            </div>
+                        </div>
+
+                    </nav>
+                </div>
+
+                <!-- Bagian Bawah Sidebar (PERSIS sidebar.blade.php) -->
+                <div class="p-4 border-t border-slate-700/60 text-xs text-slate-400">
+                    <div class="text-white font-bold text-xs capitalize">Admin Mode</div>
+                    <div class="text-[10px] text-slate-400">Simulasi Tanpa Login</div>
+                </div>
+            </aside>
+
+            <!-- =================== KONTEN UTAMA & FOOTER =================== -->
+            <div :class="sidebarOpen ? 'ml-64' : 'ml-0'" class="min-w-0 flex-1 flex flex-col min-h-[calc(100vh-4rem)] transition-all duration-300">
+                <main class="flex-1 p-4 lg:p-8 space-y-6">
+
+                    <!-- =================== TAB 1: RINGKASAN =================== -->
+                    <div x-show="activeTab === 'ringkasan'" class="space-y-6">
+                        <div>
+                            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                                RINGKASAN
+                            </div>
+                            <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
+                                Selamat datang, Rina
+                            </h1>
+                            <p class="text-sm text-slate-500 font-normal mt-1">
+                                Pantau kondisi master data dan aktivitas pengguna sistem.
+                            </p>
+                        </div>
+
+                        <!-- 4 Stats Cards -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PENGGUNA AKTIF</div>
+                                <div class="mt-2 text-4xl font-black text-slate-900" x-text="activeUsersCount">7</div>
+                                <div class="mt-1 text-xs text-slate-500">dari <span x-text="users.length">8</span> akun terdaftar</div>
+                            </div>
+
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">DISTRIBUTOR</div>
+                                <div class="mt-2 text-4xl font-black text-slate-900" x-text="distributors.length">6</div>
+                                <div class="mt-1 text-xs text-slate-500">Sumbar <span x-text="sumbarDistCount">3</span> · Riau <span x-text="riauDistCount">3</span></div>
+                            </div>
+
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PRODUK (SKU)</div>
+                                <div class="mt-2 text-4xl font-black text-slate-900" x-text="products.length">3</div>
+                                <div class="mt-1 text-xs text-slate-500">katalog master aktif</div>
+                            </div>
+
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs hover:shadow-xs transition">
+                                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">TAHUN FISKAL</div>
+                                <div class="mt-2 text-3xl font-black text-slate-900 tracking-tight" x-text="activePeriod?.tahun || '2026/2027'">2026/2027</div>
+                                <div class="mt-1 text-xs text-slate-500">hari ke-23 dari 365</div>
+                            </div>
+                        </div>
+
+                        <!-- Middle Row -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Pengguna per peran -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                                <h2 class="text-base font-bold text-slate-900 tracking-tight mb-5">Pengguna per peran</h2>
+                                <div class="space-y-4 text-xs font-medium">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="font-bold text-slate-900">Admin</span>
+                                            <span class="text-slate-500" x-text="roleCounts['Admin'] + ' akun'">1 akun</span>
+                                        </div>
+                                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                            <div class="bg-red-600 h-2 rounded-full transition-all duration-500" :style="`width: ${(roleCounts['Admin'] / users.length) * 100}%`"></div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="font-bold text-slate-900">Distributor</span>
+                                            <span class="text-slate-500" x-text="roleCounts['Distributor'] + ' akun'">3 akun</span>
+                                        </div>
+                                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                            <div class="bg-emerald-600 h-2 rounded-full transition-all duration-500" :style="`width: ${(roleCounts['Distributor'] / users.length) * 100}%`"></div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="font-bold text-slate-900">Logistik Pusat</span>
+                                            <span class="text-slate-500" x-text="roleCounts['Logistik Pusat'] + ' akun'">2 akun</span>
+                                        </div>
+                                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                            <div class="bg-[#1E293B] h-2 rounded-full transition-all duration-500" :style="`width: ${(roleCounts['Logistik Pusat'] / users.length) * 100}%`"></div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="font-bold text-slate-900">SAM</span>
+                                            <span class="text-slate-500" x-text="roleCounts['SAM'] + ' akun'">2 akun</span>
+                                        </div>
+                                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                            <div class="bg-[#1E293B] h-2 rounded-full transition-all duration-500" :style="`width: ${(roleCounts['SAM'] / users.length) * 100}%`"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="text-slate-400 font-normal whitespace-nowrap text-[11px]" x-text="log.waktu"></div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </div>
 
-        <!-- =================== TAB 2: PENGGUNA & HAK AKSES =================== -->
-        <div x-show="activeTab === 'pengguna'" class="space-y-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
-                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Pengguna & Hak Akses</h1>
-                    <p class="text-sm text-slate-500 font-normal mt-1">Atur pendaftaran akun, pembaruan profil, penetapan peran, dan otorisasi hak akses.</p>
-                </div>
-                <button x-show="!showUserForm" @click="openCreateUser()" 
-                        type="button"
-                        class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
-                    <i class="fa-solid fa-plus text-[11px]"></i>
-                    <span>Tambah Pengguna</span>
-                </button>
-            </div>
+                            <!-- Aksi Cepat -->
+                            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                                <h2 class="text-base font-bold text-slate-900 tracking-tight mb-5">Aksi cepat</h2>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-auto">
+                                    <button @click="activeTab = 'pengguna'; openCreateUser()" 
+                                            class="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
+                                        Tambah pengguna
+                                    </button>
+                                    <button @click="activeTab = 'distributor'; showDistForm = true" 
+                                            class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
+                                        Tambah distributor
+                                    </button>
+                                    <button @click="activeTab = 'produk'; showProductForm = true" 
+                                            class="bg-[#1E293B] hover:bg-slate-900 text-white font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-xs transition">
+                                        Tambah produk
+                                    </button>
+                                    <button @click="activeTab = 'tahun-fiskal'" 
+                                            class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold py-3 px-4 rounded-xl text-xs text-center shadow-2xs transition">
+                                        Atur tahun fiskal
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-            <!-- Form Pengguna Baru -->
-            <div x-cloak x-show="showUserForm" class="bg-white rounded-2xl p-6 border-2 border-red-500 shadow-sm">
-                <h2 class="text-sm font-bold text-slate-900 mb-4" x-text="isEditingUser ? 'Ubah profil pengguna' : 'Pengguna baru'"></h2>
-                <form @submit.prevent="saveUser()" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA LENGKAP</label>
-                            <input type="text" x-model="userFormData.nama" placeholder="Nama pengguna" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">EMAIL</label>
-                            <input type="email" x-model="userFormData.email" placeholder="nama@perusahaan.id" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">PERAN</label>
-                        <div class="flex flex-wrap gap-2">
-                            <template x-for="r in ['Admin', 'Distributor', 'Logistik Pusat', 'SAM']" :key="r">
-                                <button type="button" @click="userFormData.peran = r"
-                                        class="px-4 py-2 rounded-xl text-xs font-semibold transition"
-                                        :class="userFormData.peran === r ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'"
-                                        x-text="r"></button>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="pt-2 flex items-center space-x-2">
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan</button>
-                        <button type="button" @click="showUserForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
-                    </div>
-                </form>
-            </div>
+                        <!-- Aktivitas Terbaru -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs">
+                            <div class="flex items-center justify-between mb-5">
+                                <h2 class="text-base font-bold text-slate-900 tracking-tight">Aktivitas terbaru</h2>
+                                <button @click="activeTab = 'log-aktivitas'" 
+                                        class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-xl transition">
+                                    Lihat semua log
+                                </button>
+                            </div>
 
-            <!-- Table Card -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div class="w-full md:w-96">
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">CARI PENGGUNA</label>
-                        <div class="relative">
-                            <input type="text" x-model="userSearchQuery" placeholder="Nama atau email"
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500">
-                            <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-xs"></i>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-1.5 self-end">
-                        <template x-for="tab in ['Semua', 'Admin', 'Distributor', 'Logistik Pusat', 'SAM']" :key="tab">
-                            <button type="button" @click="userRoleFilter = tab"
-                                    class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
-                                    :class="userRoleFilter === tab ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                                    x-text="tab"></button>
-                        </template>
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead>
-                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                <th class="pb-3 px-3">PENGGUNA</th>
-                                <th class="pb-3 px-3">PERAN</th>
-                                <th class="pb-3 px-3">STATUS</th>
-                                <th class="pb-3 px-3">LOGIN TERAKHIR</th>
-                                <th class="pb-3 px-3 text-right">AKSI</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <template x-for="user in filteredUsers" :key="user.id">
-                                <tr class="hover:bg-slate-50/80 transition-colors">
-                                    <td class="py-3 px-3">
-                                        <div class="flex items-center space-x-3">
-                                            <div class="w-8 h-8 rounded-lg bg-[#0B132B] text-white flex items-center justify-center font-bold text-[11px] flex-shrink-0" x-text="user.inisial"></div>
-                                            <div>
-                                                <div class="font-bold text-slate-900" x-text="user.nama"></div>
-                                                <div class="text-[11px] text-slate-500" x-text="user.email"></div>
+                            <div class="divide-y divide-slate-100">
+                                <template x-for="log in logs.slice(0, 5)" :key="log.id">
+                                    <div class="py-3.5 flex items-center justify-between text-xs">
+                                        <div class="flex items-center space-x-3 min-w-0 pr-4">
+                                            <span class="px-2.5 py-1 rounded-md font-bold text-[11px] text-white flex-shrink-0"
+                                                  :class="{
+                                                      'bg-[#1E293B]': log.aksi === 'Ubah' || log.aksi === 'Login' || log.aksi === 'Ekspor',
+                                                      'bg-emerald-600': log.aksi === 'Tambah',
+                                                      'bg-red-600': log.aksi === 'Hapus'
+                                                  }"
+                                                  x-text="log.aksi"></span>
+                                            <div class="truncate text-slate-700">
+                                                <span class="font-bold text-slate-900" x-text="log.pengguna"></span>
+                                                <span class="text-slate-400 mx-1">&middot;</span>
+                                                <span x-text="log.keterangan"></span>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td class="py-3 px-3">
-                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
-                                              :class="{
-                                                  'bg-red-600': user.peran === 'Admin',
-                                                  'bg-emerald-600': user.peran === 'Distributor',
-                                                  'bg-[#0B132B]': user.peran === 'Logistik Pusat',
-                                                  'bg-slate-600': user.peran === 'SAM'
-                                              }"
-                                              x-text="user.peran"></span>
-                                    </td>
-                                    <td class="py-3 px-3">
-                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
-                                              :class="user.status === 'Aktif' ? 'bg-emerald-600' : 'bg-slate-700'"
-                                              x-text="user.status"></span>
-                                    </td>
-                                    <td class="py-3 px-3 text-slate-500" x-text="user.loginTerakhir"></td>
-                                    <td class="py-3 px-3 text-right">
-                                        <div class="inline-flex items-center space-x-1.5">
-                                            <button @click="openEditUser(user)" class="w-7 h-7 rounded-lg bg-slate-500 hover:bg-slate-600 text-white flex items-center justify-center">
-                                                <i class="fa-solid fa-pencil text-[10px]"></i>
-                                            </button>
-                                            <button @click="toggleUserStatus(user)" class="w-7 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center">
-                                                <i class="fa-solid fa-power-off text-[10px]"></i>
-                                            </button>
-                                            <button @click="deleteUser(user)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center">
-                                                <i class="fa-solid fa-trash text-[10px]"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Matriks Hak Akses -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
-                <div>
-                    <h2 class="text-base font-bold text-slate-900 tracking-tight">Matriks hak akses per peran</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Klik sel untuk memberi atau mencabut akses modul. Hak akses Admin dikunci.</p>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead>
-                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                <th class="pb-3 px-4 w-1/3">MODUL</th>
-                                <th class="pb-3 px-4 text-center">ADMIN</th>
-                                <th class="pb-3 px-4 text-center">DISTRIBUTOR</th>
-                                <th class="pb-3 px-4 text-center">LOGISTIK PUSAT</th>
-                                <th class="pb-3 px-4 text-center">SAM</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <template x-for="perm in permissions" :key="perm.modul">
-                                <tr class="hover:bg-slate-50/50 transition-colors">
-                                    <td class="py-3.5 px-4 font-semibold text-slate-800" x-text="perm.modul"></td>
-                                    <td class="py-3.5 px-4 text-center cursor-not-allowed" @click="togglePermission(perm, 'admin')">
-                                        <div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div>
-                                    </td>
-                                    <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'distributor')">
-                                        <template x-if="perm.distributor"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
-                                        <template x-if="!perm.distributor"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
-                                    </td>
-                                    <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'logistik')">
-                                        <template x-if="perm.logistik"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
-                                        <template x-if="!perm.logistik"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
-                                    </td>
-                                    <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'sam')">
-                                        <template x-if="perm.sam"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
-                                        <template x-if="!perm.sam"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- =================== TAB 3: DATA DISTRIBUTOR =================== -->
-        <div x-show="activeTab === 'distributor'" class="space-y-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
-                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Data Distributor</h1>
-                    <p class="text-sm text-slate-500 font-normal mt-1">Kelola profil distributor, cakupan wilayah operasional (Sumbar dan Riau), dan kontak resmi perusahaan.</p>
-                </div>
-                <button x-show="!showDistForm" @click="showDistForm = true" type="button"
-                        class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
-                    <i class="fa-solid fa-plus text-[11px]"></i>
-                    <span>Tambah distributor</span>
-                </button>
-            </div>
-
-            <!-- Form Distributor Baru -->
-            <div x-cloak x-show="showDistForm" class="bg-white rounded-2xl p-6 border-2 border-emerald-500/60 shadow-sm">
-                <h2 class="text-sm font-bold text-slate-900 mb-4">Distributor baru</h2>
-                <form @submit.prevent="saveDistributor()" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA PERUSAHAAN</label>
-                            <input type="text" x-model="distFormData.nama" placeholder="PT / CV ..." required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA KONTAK RESMI</label>
-                            <input type="text" x-model="distFormData.kontak" placeholder="Nama penanggung jawab" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">TELEPON</label>
-                            <input type="text" x-model="distFormData.telepon" placeholder="0xxx-xxx-xxx" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">CAKUPAN WILAYAH</label>
-                        <div class="flex items-center space-x-2">
-                            <button type="button" @click="distFormData.wilayah = 'Sumbar'"
-                                    class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
-                                    :class="distFormData.wilayah === 'Sumbar' ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'">Sumbar</button>
-                            <button type="button" @click="distFormData.wilayah = 'Riau'"
-                                    class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
-                                    :class="distFormData.wilayah === 'Riau' ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'">Riau</button>
-                        </div>
-                    </div>
-                    <div class="pt-2 flex items-center space-x-2">
-                        <button type="submit" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan</button>
-                        <button type="button" @click="showDistForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Table Card -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
-                <div class="flex items-center space-x-2">
-                    <template x-for="tab in ['Semua', 'Sumbar', 'Riau']" :key="tab">
-                        <button type="button" @click="distWilayahFilter = tab"
-                                class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
-                                :class="distWilayahFilter === tab ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                                x-text="tab"></button>
-                    </template>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead>
-                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                <th class="pb-3 px-4 w-28">KODE</th>
-                                <th class="pb-3 px-4">DISTRIBUTOR</th>
-                                <th class="pb-3 px-4">WILAYAH</th>
-                                <th class="pb-3 px-4">KONTAK RESMI</th>
-                                <th class="pb-3 px-4 text-right">AKSI</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <template x-for="dist in filteredDistributors" :key="dist.id">
-                                <tr class="hover:bg-slate-50/80 transition-colors">
-                                    <td class="py-3.5 px-4 font-semibold text-slate-700" x-text="dist.kode"></td>
-                                    <td class="py-3.5 px-4 font-bold text-slate-900" x-text="dist.nama"></td>
-                                    <td class="py-3.5 px-4">
-                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
-                                              :class="dist.wilayah === 'Sumbar' ? 'bg-emerald-600' : 'bg-red-600'"
-                                              x-text="dist.wilayah"></span>
-                                    </td>
-                                    <td class="py-3.5 px-4">
-                                        <div class="font-bold text-slate-900" x-text="dist.kontak"></div>
-                                        <div class="text-[11px] text-slate-500" x-text="dist.telepon"></div>
-                                    </td>
-                                    <td class="py-3.5 px-4 text-right">
-                                        <button @click="deleteDistributor(dist)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white inline-flex items-center justify-center">
-                                            <i class="fa-solid fa-trash text-[10px]"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- =================== TAB 4: DATA PRODUK (SKU) =================== -->
-        <div x-show="activeTab === 'produk'" class="space-y-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
-                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Data Produk (SKU)</h1>
-                    <p class="text-sm text-slate-500 font-normal mt-1">Atur katalog produk master, struktur harga, dan formula konversi satuan isi kontainer.</p>
-                </div>
-                <button x-show="!showProductForm" @click="showProductForm = true" type="button"
-                        class="bg-[#0B132B] hover:bg-slate-900 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
-                    <i class="fa-solid fa-plus text-[11px]"></i>
-                    <span>Tambah SKU</span>
-                </button>
-            </div>
-
-            <!-- Form SKU Baru -->
-            <div x-cloak x-show="showProductForm" class="bg-white rounded-2xl p-6 border-2 border-slate-900 shadow-sm">
-                <h2 class="text-sm font-bold text-slate-900 mb-4">Tambah Master Produk SKU Baru</h2>
-                <form @submit.prevent="saveProduct()" class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">KODE SKU</label>
-                            <input type="text" x-model="productFormData.kode" placeholder="SKU-004" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA PRODUK</label>
-                            <input type="text" x-model="productFormData.nama" placeholder="Contoh: FAN Apple 325ml" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">HARGA / KARTON (RP)</label>
-                            <input type="number" x-model="productFormData.harga" step="1000" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">ISI / KONTAINER</label>
-                            <input type="number" x-model="productFormData.isi" value="2000" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
-                        </div>
-                    </div>
-                    <div class="pt-2 flex items-center space-x-2">
-                        <button type="submit" class="bg-[#0B132B] hover:bg-slate-900 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan SKU</button>
-                        <button type="button" @click="showProductForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Table Card -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead>
-                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                <th class="pb-3 px-4 w-28">SKU</th>
-                                <th class="pb-3 px-4">PRODUK</th>
-                                <th class="pb-3 px-4">HARGA / KARTON</th>
-                                <th class="pb-3 px-4">ISI / KONTAINER</th>
-                                <th class="pb-3 px-4">NILAI / KONTAINER</th>
-                                <th class="pb-3 px-4 text-right">AKSI</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <template x-for="prod in products" :key="prod.id">
-                                <tr class="hover:bg-slate-50/80 transition-colors">
-                                    <td class="py-3.5 px-4 font-semibold text-slate-700" x-text="prod.kode"></td>
-                                    <td class="py-3.5 px-4 font-bold text-slate-900" x-text="prod.nama"></td>
-                                    <td class="py-3.5 px-4 text-slate-700 font-medium" x-text="adminStore.formatRupiah(prod.harga)"></td>
-                                    <td class="py-3.5 px-4 text-slate-700 font-medium" x-text="adminStore.formatNumber(prod.isi) + ' karton'"></td>
-                                    <td class="py-3.5 px-4 font-extrabold text-slate-900" x-text="adminStore.formatRupiah(prod.nilai)"></td>
-                                    <td class="py-3.5 px-4 text-right">
-                                        <button @click="deleteProduct(prod)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white inline-flex items-center justify-center">
-                                            <i class="fa-solid fa-trash text-[10px]"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Kalkulator Konversi Kontainer -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
-                <div>
-                    <h2 class="text-base font-bold text-slate-900 tracking-tight">Kalkulator konversi kontainer</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Karton = jumlah kontainer &times; isi karton per kontainer</p>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2">
-                    <template x-for="p in products" :key="p.id">
-                        <button type="button" @click="selectedSkuId = p.id"
-                                class="px-4 py-2 rounded-xl text-xs font-semibold transition"
-                                :class="selectedSkuId === p.id ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                                x-text="p.kode + ' · ' + p.nama"></button>
-                    </template>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch pt-2">
-                    <div class="bg-[#EBF3FB] rounded-2xl p-5 border border-blue-100 flex flex-col justify-center">
-                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">JUMLAH KONTAINER</label>
-                        <input type="number" x-model.number="jumlahKontainer" min="1" max="500"
-                               class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0B132B]">
-                        <span class="text-[10px] text-slate-400 mt-1.5">1 kontainer = <span x-text="adminStore.formatNumber(selectedProduct?.isi || 2000)"></span> karton</span>
-                    </div>
-
-                    <div class="bg-[#0B132B] text-white rounded-2xl p-5 shadow-xs flex flex-col justify-center">
-                        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total karton</div>
-                        <div class="mt-2 text-2xl font-black tracking-tight" x-text="adminStore.formatNumber(calculatedTotalCartons) + ' karton'">10.000 karton</div>
-                        <div class="mt-1 text-[11px] text-slate-400" x-text="`${jumlahKontainer || 0} kontainer × ${adminStore.formatNumber(selectedProduct?.isi || 2000)} karton`"></div>
-                    </div>
-
-                    <div class="bg-emerald-700 text-white rounded-2xl p-5 shadow-xs flex flex-col justify-center">
-                        <div class="text-[11px] font-semibold text-emerald-100 uppercase tracking-wider">Total nilai</div>
-                        <div class="mt-2 text-2xl font-black tracking-tight" x-text="adminStore.formatRupiah(calculatedTotalValue)">Rp 1.850.000.000</div>
-                        <div class="mt-1 text-[11px] text-emerald-100" x-text="`${adminStore.formatNumber(calculatedTotalCartons)} karton × ${adminStore.formatRupiah(selectedProduct?.harga || 0)}`"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- =================== TAB 5: PERIODE TAHUN FISKAL =================== -->
-        <div x-show="activeTab === 'tahun-fiskal'" class="space-y-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
-                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Periode Tahun Fiskal</h1>
-                    <p class="text-sm text-slate-500 font-normal mt-1">Rentang tahun fiskal 1 Oktober &ndash; 30 September menjadi acuan perhitungan kuota dan agregasi laporan.</p>
-                </div>
-                <button x-show="!showFiscalForm" @click="showFiscalForm = true" type="button"
-                        class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
-                    <i class="fa-solid fa-plus text-[11px]"></i>
-                    <span>Buat periode</span>
-                </button>
-            </div>
-
-            <!-- Top Card Periode Berjalan -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PERIODE BERJALAN</div>
-                        <div class="text-3xl font-black text-slate-900 tracking-tight mt-1" x-text="activePeriod?.tahun || '2026/2027'">2026/2027</div>
-                        <div class="text-xs text-slate-500 mt-0.5" x-text="activePeriod?.rentang || '1 Oktober 2026 – 30 September 2027'"></div>
-                    </div>
-                    <div class="sm:text-right">
-                        <div class="text-3xl font-black text-slate-900">6%</div>
-                        <div class="text-xs text-slate-500 mt-0.5">hari ke-23 dari 365</div>
-                    </div>
-                </div>
-
-                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div class="bg-red-600 h-2 rounded-full" style="width: 6%;"></div>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2 pt-1">
-                    <template x-for="m in months" :key="m">
-                        <button type="button" @click="selectedMonth = m"
-                                class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
-                                :class="selectedMonth === m ? 'bg-red-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                                x-text="m"></button>
-                    </template>
-                </div>
-            </div>
-
-            <!-- Form Periode Baru -->
-            <div x-cloak x-show="showFiscalForm" class="bg-white rounded-2xl p-6 border-2 border-red-500 shadow-sm">
-                <h2 class="text-sm font-bold text-slate-900 mb-4">Periode baru</h2>
-                <form @submit.prevent="savePeriod()" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                        <div>
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">TAHUN MULAI</label>
-                            <input type="number" x-model="inputTahunMulai" min="2020" max="2050" required
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Rentang otomatis</label>
-                            <div class="bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800"
-                                 x-text="calculatedRentang"></div>
-                        </div>
-                    </div>
-                    <div class="pt-2 flex items-center space-x-2">
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan sebagai draf</button>
-                        <button type="button" @click="showFiscalForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Grid Periode -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <template x-for="p in fiscalPeriods" :key="p.id">
-                    <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
-                        <div>
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="text-xl font-black text-slate-900 tracking-tight" x-text="p.tahun"></div>
-                                <span class="px-2.5 py-0.5 rounded text-[11px] font-bold text-white uppercase tracking-wider"
-                                      :class="{
-                                          'bg-[#0B132B]': p.status === 'Draf' || p.status === 'Selesai',
-                                          'bg-emerald-600': p.status === 'Aktif'
-                                      }"
-                                      x-text="p.status"></span>
+                                        <div class="text-slate-400 font-normal whitespace-nowrap text-[11px]" x-text="log.waktu"></div>
+                                    </div>
+                                </template>
                             </div>
-                            <div class="text-xs text-slate-500 leading-relaxed" x-text="p.rentang"></div>
                         </div>
-                        <div class="mt-6">
-                            <template x-if="p.status === 'Draf'">
-                                <button type="button" @click="activatePeriod(p)"
-                                        class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2.5 rounded-xl text-xs text-center transition">Aktifkan periode</button>
-                            </template>
-                            <template x-if="p.status === 'Aktif'">
-                                <div class="text-emerald-700 text-xs font-bold py-2 flex items-center space-x-1.5"><i class="fa-solid fa-circle-check text-xs"></i><span>Sedang berjalan</span></div>
-                            </template>
-                            <template x-if="p.status === 'Selesai'">
-                                <div class="text-slate-400 text-xs py-2 font-medium">Tutup buku & diarsipkan</div>
+                    </div>
+
+                    <!-- =================== TAB 2: PENGGUNA & HAK AKSES =================== -->
+                    <div x-show="activeTab === 'pengguna'" class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Pengguna & Hak Akses</h1>
+                                <p class="text-sm text-slate-500 font-normal mt-1">Atur pendaftaran akun, pembaruan profil, penetapan peran, dan otorisasi hak akses.</p>
+                            </div>
+                            <button x-show="!showUserForm" @click="openCreateUser()" 
+                                    type="button"
+                                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                                <i class="fa-solid fa-plus text-[11px]"></i>
+                                <span>Tambah Pengguna</span>
+                            </button>
+                        </div>
+
+                        <!-- Form Pengguna Baru -->
+                        <div x-cloak x-show="showUserForm" class="bg-white rounded-2xl p-6 border-2 border-red-500 shadow-sm">
+                            <h2 class="text-sm font-bold text-slate-900 mb-4" x-text="isEditingUser ? 'Ubah profil pengguna' : 'Pengguna baru'"></h2>
+                            <form @submit.prevent="saveUser()" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA LENGKAP</label>
+                                        <input type="text" x-model="userFormData.nama" placeholder="Nama pengguna" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">EMAIL</label>
+                                        <input type="email" x-model="userFormData.email" placeholder="nama@perusahaan.id" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">PERAN</label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="r in ['Admin', 'Distributor', 'Logistik Pusat', 'SAM']" :key="r">
+                                            <button type="button" @click="userFormData.peran = r"
+                                                    class="px-4 py-2 rounded-xl text-xs font-semibold transition"
+                                                    :class="userFormData.peran === r ? 'bg-[#1E293B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'"
+                                                    x-text="r"></button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="pt-2 flex items-center space-x-2">
+                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan</button>
+                                    <button type="button" @click="showUserForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Table Card -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="w-full md:w-96">
+                                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">CARI PENGGUNA</label>
+                                    <div class="relative">
+                                        <input type="text" x-model="userSearchQuery" placeholder="Nama atau email"
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                        <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-xs"></i>
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-1.5 self-end">
+                                    <template x-for="tab in ['Semua', 'Admin', 'Distributor', 'Logistik Pusat', 'SAM']" :key="tab">
+                                        <button type="button" @click="userRoleFilter = tab"
+                                                class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
+                                                :class="userRoleFilter === tab ? 'bg-[#1E293B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                                x-text="tab"></button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="pb-3 px-3">PENGGUNA</th>
+                                        <th class="pb-3 px-3">PERAN</th>
+                                        <th class="pb-3 px-3">STATUS</th>
+                                        <th class="pb-3 px-3">LOGIN TERAKHIR</th>
+                                        <th class="pb-3 px-3 text-right">AKSI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="user in filteredUsers" :key="user.id">
+                                        <tr class="hover:bg-slate-50/80 transition-colors">
+                                            <td class="py-3 px-3">
+                                                <div class="flex items-center space-x-3">
+                                                    <div class="w-8 h-8 rounded-lg bg-[#1E293B] text-white flex items-center justify-center font-bold text-[11px] flex-shrink-0" x-text="user.inisial"></div>
+                                                    <div>
+                                                        <div class="font-bold text-slate-900" x-text="user.nama"></div>
+                                                        <div class="text-[11px] text-slate-500" x-text="user.email"></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="py-3 px-3">
+                                                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                                      :class="{
+                                                          'bg-red-600': user.peran === 'Admin',
+                                                          'bg-emerald-600': user.peran === 'Distributor',
+                                                          'bg-[#1E293B]': user.peran === 'Logistik Pusat',
+                                                          'bg-slate-600': user.peran === 'SAM'
+                                                      }"
+                                                      x-text="user.peran"></span>
+                                            </td>
+                                            <td class="py-3 px-3">
+                                                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                                      :class="user.status === 'Aktif' ? 'bg-emerald-600' : 'bg-slate-700'"
+                                                      x-text="user.status"></span>
+                                            </td>
+                                            <td class="py-3 px-3 text-slate-500" x-text="user.loginTerakhir"></td>
+                                            <td class="py-3 px-3 text-right">
+                                                <div class="inline-flex items-center space-x-1.5">
+                                                    <button @click="openEditUser(user)" class="w-7 h-7 rounded-lg bg-slate-500 hover:bg-slate-600 text-white flex items-center justify-center" title="Ubah profil">
+                                                        <i class="fa-solid fa-pencil text-[10px]"></i>
+                                                    </button>
+                                                    <button @click="toggleUserStatus(user)" class="w-7 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center" title="Toggle status">
+                                                        <i class="fa-solid fa-power-off text-[10px]"></i>
+                                                    </button>
+                                                    <button @click="deleteUser(user)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center" title="Hapus pengguna">
+                                                        <i class="fa-solid fa-trash text-[10px]"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            </div>
+                        </div>
+
+                        <!-- Matriks Hak Akses -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
+                            <div>
+                                <h2 class="text-base font-bold text-slate-900 tracking-tight">Matriks hak akses per peran</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Klik sel untuk memberi atau mencabut akses modul. Hak akses Admin dikunci.</p>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="pb-3 px-4 w-1/3">MODUL</th>
+                                        <th class="pb-3 px-4 text-center">ADMIN</th>
+                                        <th class="pb-3 px-4 text-center">DISTRIBUTOR</th>
+                                        <th class="pb-3 px-4 text-center">LOGISTIK PUSAT</th>
+                                        <th class="pb-3 px-4 text-center">SAM</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="perm in permissions" :key="perm.modul">
+                                        <tr class="hover:bg-slate-50/50 transition-colors">
+                                            <td class="py-3.5 px-4 font-semibold text-slate-800" x-text="perm.modul"></td>
+                                            <td class="py-3.5 px-4 text-center cursor-not-allowed" @click="togglePermission(perm, 'admin')">
+                                                <div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div>
+                                            </td>
+                                            <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'distributor')">
+                                                <template x-if="perm.distributor"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
+                                                <template x-if="!perm.distributor"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
+                                            </td>
+                                            <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'logistik')">
+                                                <template x-if="perm.logistik"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
+                                                <template x-if="!perm.logistik"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
+                                            </td>
+                                            <td class="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/60 rounded-lg transition" @click="togglePermission(perm, 'sam')">
+                                                <template x-if="perm.sam"><div class="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-600 text-white text-[11px]"><i class="fa-solid fa-check"></i></div></template>
+                                                <template x-if="!perm.sam"><span class="text-slate-400 font-bold text-sm">&mdash;</span></template>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- =================== TAB 3: DATA DISTRIBUTOR =================== -->
+                    <div x-show="activeTab === 'distributor'" class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Data Distributor</h1>
+                                <p class="text-sm text-slate-500 font-normal mt-1">Kelola profil distributor, cakupan wilayah operasional (Sumbar dan Riau), dan kontak resmi perusahaan.</p>
+                            </div>
+                            <button x-show="!showDistForm" @click="showDistForm = true" type="button"
+                                    class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                                <i class="fa-solid fa-plus text-[11px]"></i>
+                                <span>Tambah distributor</span>
+                            </button>
+                        </div>
+
+                        <!-- Form Distributor Baru -->
+                        <div x-cloak x-show="showDistForm" class="bg-white rounded-2xl p-6 border-2 border-emerald-500/60 shadow-sm">
+                            <h2 class="text-sm font-bold text-slate-900 mb-4">Distributor baru</h2>
+                            <form @submit.prevent="saveDistributor()" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA PERUSAHAAN</label>
+                                        <input type="text" x-model="distFormData.nama" placeholder="PT / CV ..." required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA KONTAK RESMI</label>
+                                        <input type="text" x-model="distFormData.kontak" placeholder="Nama penanggung jawab" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">TELEPON</label>
+                                        <input type="text" x-model="distFormData.telepon" placeholder="0xxx-xxx-xxx" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">CAKUPAN WILAYAH</label>
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button" @click="distFormData.wilayah = 'Sumbar'"
+                                                class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
+                                                :class="distFormData.wilayah === 'Sumbar' ? 'bg-[#1E293B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'">Sumbar</button>
+                                        <button type="button" @click="distFormData.wilayah = 'Riau'"
+                                                class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
+                                                :class="distFormData.wilayah === 'Riau' ? 'bg-[#1E293B] text-white shadow-xs' : 'bg-slate-200/80 hover:bg-slate-300 text-slate-700'">Riau</button>
+                                    </div>
+                                </div>
+                                <div class="pt-2 flex items-center space-x-2">
+                                    <button type="submit" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan</button>
+                                    <button type="button" @click="showDistForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Table Card -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                            <div class="flex items-center space-x-2">
+                                <template x-for="tab in ['Semua', 'Sumbar', 'Riau']" :key="tab">
+                                    <button type="button" @click="distWilayahFilter = tab"
+                                            class="px-4 py-1.5 rounded-xl text-xs font-semibold transition"
+                                            :class="distWilayahFilter === tab ? 'bg-[#1E293B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                            x-text="tab"></button>
+                                </template>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="pb-3 px-4 w-28">KODE</th>
+                                        <th class="pb-3 px-4">DISTRIBUTOR</th>
+                                        <th class="pb-3 px-4">WILAYAH</th>
+                                        <th class="pb-3 px-4">KONTAK RESMI</th>
+                                        <th class="pb-3 px-4 text-right">AKSI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="dist in filteredDistributors" :key="dist.id">
+                                        <tr class="hover:bg-slate-50/80 transition-colors">
+                                            <td class="py-3.5 px-4 font-semibold text-slate-700" x-text="dist.kode"></td>
+                                            <td class="py-3.5 px-4 font-bold text-slate-900" x-text="dist.nama"></td>
+                                            <td class="py-3.5 px-4">
+                                                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                                      :class="dist.wilayah === 'Sumbar' ? 'bg-emerald-600' : 'bg-red-600'"
+                                                      x-text="dist.wilayah"></span>
+                                            </td>
+                                            <td class="py-3.5 px-4">
+                                                <div class="font-bold text-slate-900" x-text="dist.kontak"></div>
+                                                <div class="text-[11px] text-slate-500" x-text="dist.telepon"></div>
+                                            </td>
+                                            <td class="py-3.5 px-4 text-right">
+                                                <button @click="deleteDistributor(dist)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white inline-flex items-center justify-center">
+                                                    <i class="fa-solid fa-trash text-[10px]"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- =================== TAB 4: DATA PRODUK (SKU) =================== -->
+                    <div x-show="activeTab === 'produk'" class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Data Produk (SKU)</h1>
+                                <p class="text-sm text-slate-500 font-normal mt-1">Atur katalog produk master, struktur harga, dan formula konversi satuan isi kontainer.</p>
+                            </div>
+                            <button x-show="!showProductForm" @click="showProductForm = true" type="button"
+                                    class="bg-[#1E293B] hover:bg-slate-900 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                                <i class="fa-solid fa-plus text-[11px]"></i>
+                                <span>Tambah SKU</span>
+                            </button>
+                        </div>
+
+                        <!-- Form SKU Baru -->
+                        <div x-cloak x-show="showProductForm" class="bg-white rounded-2xl p-6 border-2 border-slate-900 shadow-sm">
+                            <h2 class="text-sm font-bold text-slate-900 mb-4">Tambah Master Produk SKU Baru</h2>
+                            <form @submit.prevent="saveProduct()" class="space-y-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">KODE SKU</label>
+                                        <input type="text" x-model="productFormData.kode" placeholder="SKU-004" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">NAMA PRODUK</label>
+                                        <input type="text" x-model="productFormData.nama" placeholder="Contoh: FAN Apple 325ml" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">HARGA / KARTON (RP)</label>
+                                        <input type="number" x-model="productFormData.harga" step="1000" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">ISI / KONTAINER</label>
+                                        <input type="number" x-model="productFormData.isi" value="2000" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800">
+                                    </div>
+                                </div>
+                                <div class="pt-2 flex items-center space-x-2">
+                                    <button type="submit" class="bg-[#1E293B] hover:bg-slate-900 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan SKU</button>
+                                    <button type="button" @click="showProductForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Table Card -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-4">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="pb-3 px-4 w-28">SKU</th>
+                                        <th class="pb-3 px-4">PRODUK</th>
+                                        <th class="pb-3 px-4">HARGA / KARTON</th>
+                                        <th class="pb-3 px-4">ISI / KONTAINER</th>
+                                        <th class="pb-3 px-4">NILAI / KONTAINER</th>
+                                        <th class="pb-3 px-4 text-right">AKSI</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="prod in products" :key="prod.id">
+                                        <tr class="hover:bg-slate-50/80 transition-colors">
+                                            <td class="py-3.5 px-4 font-semibold text-slate-700" x-text="prod.kode"></td>
+                                            <td class="py-3.5 px-4 font-bold text-slate-900" x-text="prod.nama"></td>
+                                            <td class="py-3.5 px-4 text-slate-700 font-medium" x-text="adminStore.formatRupiah(prod.harga)"></td>
+                                            <td class="py-3.5 px-4 text-slate-700 font-medium" x-text="adminStore.formatNumber(prod.isi) + ' karton'"></td>
+                                            <td class="py-3.5 px-4 font-extrabold text-slate-900" x-text="adminStore.formatRupiah(prod.nilai)"></td>
+                                            <td class="py-3.5 px-4 text-right">
+                                                <button @click="deleteProduct(prod)" class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white inline-flex items-center justify-center">
+                                                    <i class="fa-solid fa-trash text-[10px]"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            </div>
+                        </div>
+
+                        <!-- Kalkulator Konversi Kontainer -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                            <div>
+                                <h2 class="text-base font-bold text-slate-900 tracking-tight">Kalkulator konversi kontainer</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Karton = jumlah kontainer &times; isi karton per kontainer</p>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                <template x-for="p in products" :key="p.id">
+                                    <button type="button" @click="selectedSkuId = p.id"
+                                            class="px-4 py-2 rounded-xl text-xs font-semibold transition"
+                                            :class="selectedSkuId === p.id ? 'bg-[#1E293B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                            x-text="p.kode + ' · ' + p.nama"></button>
+                                </template>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch pt-2">
+                                <div class="bg-[#EBF3FB] rounded-2xl p-5 border border-blue-100 flex flex-col justify-center">
+                                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">JUMLAH KONTAINER</label>
+                                    <input type="number" x-model.number="jumlahKontainer" min="1" max="500"
+                                           class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1E293B]">
+                                    <span class="text-[10px] text-slate-400 mt-1.5">1 kontainer = <span x-text="adminStore.formatNumber(selectedProduct?.isi || 2000)"></span> karton</span>
+                                </div>
+
+                                <div class="bg-[#1E293B] text-white rounded-2xl p-5 shadow-xs flex flex-col justify-center">
+                                    <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total karton</div>
+                                    <div class="mt-2 text-2xl font-black tracking-tight" x-text="adminStore.formatNumber(calculatedTotalCartons) + ' karton'">10.000 karton</div>
+                                    <div class="mt-1 text-[11px] text-slate-400" x-text="`${jumlahKontainer || 0} kontainer × ${adminStore.formatNumber(selectedProduct?.isi || 2000)} karton`"></div>
+                                </div>
+
+                                <div class="bg-emerald-700 text-white rounded-2xl p-5 shadow-xs flex flex-col justify-center">
+                                    <div class="text-[11px] font-semibold text-emerald-100 uppercase tracking-wider">Total nilai</div>
+                                    <div class="mt-2 text-2xl font-black tracking-tight" x-text="adminStore.formatRupiah(calculatedTotalValue)">Rp 1.850.000.000</div>
+                                    <div class="mt-1 text-[11px] text-emerald-100" x-text="`${adminStore.formatNumber(calculatedTotalCartons)} karton × ${adminStore.formatRupiah(selectedProduct?.harga || 0)}`"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- =================== TAB 5: PERIODE TAHUN FISKAL =================== -->
+                    <div x-show="activeTab === 'tahun-fiskal'" class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
+                                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Periode Tahun Fiskal</h1>
+                                <p class="text-sm text-slate-500 font-normal mt-1">Rentang tahun fiskal 1 Oktober &ndash; 30 September menjadi acuan perhitungan kuota dan agregasi laporan.</p>
+                            </div>
+                            <button x-show="!showFiscalForm" @click="showFiscalForm = true" type="button"
+                                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-2">
+                                <i class="fa-solid fa-plus text-[11px]"></i>
+                                <span>Buat periode</span>
+                            </button>
+                        </div>
+
+                        <!-- Top Card Periode Berjalan -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div>
+                                    <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">PERIODE BERJALAN</div>
+                                    <div class="text-3xl font-black text-slate-900 tracking-tight mt-1" x-text="activePeriod?.tahun || '2026/2027'">2026/2027</div>
+                                    <div class="text-xs text-slate-500 mt-0.5" x-text="activePeriod?.rentang || '1 Oktober 2026 – 30 September 2027'"></div>
+                                </div>
+                                <div class="sm:text-right">
+                                    <div class="text-3xl font-black text-slate-900">6%</div>
+                                    <div class="text-xs text-slate-500 mt-0.5">hari ke-23 dari 365</div>
+                                </div>
+                            </div>
+
+                            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div class="bg-red-600 h-2 rounded-full" style="width: 6%;"></div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                <template x-for="m in months" :key="m">
+                                    <button type="button" @click="selectedMonth = m"
+                                            class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
+                                            :class="selectedMonth === m ? 'bg-red-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                            x-text="m"></button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Form Periode Baru -->
+                        <div x-cloak x-show="showFiscalForm" class="bg-white rounded-2xl p-6 border-2 border-red-500 shadow-sm">
+                            <h2 class="text-sm font-bold text-slate-900 mb-4">Periode baru</h2>
+                            <form @submit.prevent="savePeriod()" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                    <div>
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">TAHUN MULAI</label>
+                                        <input type="number" x-model="inputTahunMulai" min="2020" max="2050" required
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Rentang otomatis</label>
+                                        <div class="bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-800"
+                                             x-text="calculatedRentang"></div>
+                                    </div>
+                                </div>
+                                <div class="pt-2 flex items-center space-x-2">
+                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-2 rounded-xl text-xs shadow-xs transition">Simpan sebagai draf</button>
+                                    <button type="button" @click="showFiscalForm = false" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-6 py-2 rounded-xl text-xs transition">Batal</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Grid Periode -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                            <template x-for="p in fiscalPeriods" :key="p.id">
+                                <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="text-xl font-black text-slate-900 tracking-tight" x-text="p.tahun"></div>
+                                            <span class="px-2.5 py-0.5 rounded text-[11px] font-bold text-white uppercase tracking-wider"
+                                                  :class="{
+                                                      'bg-[#1E293B]': p.status === 'Draf' || p.status === 'Selesai',
+                                                      'bg-emerald-600': p.status === 'Aktif'
+                                                  }"
+                                                  x-text="p.status"></span>
+                                        </div>
+                                        <div class="text-xs text-slate-500 leading-relaxed" x-text="p.rentang"></div>
+                                    </div>
+                                    <div class="mt-6">
+                                        <template x-if="p.status === 'Draf'">
+                                            <button type="button" @click="activatePeriod(p)"
+                                                    class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2.5 rounded-xl text-xs text-center transition">Aktifkan periode</button>
+                                        </template>
+                                        <template x-if="p.status === 'Aktif'">
+                                            <div class="text-emerald-700 text-xs font-bold py-2 flex items-center space-x-1.5"><i class="fa-solid fa-circle-check text-xs"></i><span>Sedang berjalan</span></div>
+                                        </template>
+                                        <template x-if="p.status === 'Selesai'">
+                                            <div class="text-slate-400 text-xs py-2 font-medium">Tutup buku & diarsipkan</div>
+                                        </template>
+                                    </div>
+                                </div>
                             </template>
                         </div>
                     </div>
-                </template>
-            </div>
-        </div>
 
-        <!-- =================== TAB 6: LOG AKTIVITAS =================== -->
-        <div x-show="activeTab === 'log-aktivitas'" class="space-y-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">PENGAWASAN</div>
-                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Log Aktivitas</h1>
-                    <p class="text-sm text-slate-500 font-normal mt-1">Rekam jejak aktivitas pengguna (audit trail) untuk pengawasan sistem.</p>
-                </div>
-                <button @click="exportLogFile()" type="button"
-                        class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold px-4 py-2.5 rounded-xl text-xs shadow-2xs transition flex items-center space-x-2">
-                    <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
-                    <span>Ekspor log</span>
-                </button>
-            </div>
+                    <!-- =================== TAB 6: LOG AKTIVITAS =================== -->
+                    <div x-show="activeTab === 'log-aktivitas'" class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">PENGAWASAN</div>
+                                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Log Aktivitas</h1>
+                                <p class="text-sm text-slate-500 font-normal mt-1">Rekam jejak aktivitas pengguna (audit trail) untuk pengawasan sistem.</p>
+                            </div>
+                            <button @click="exportLogFile()" type="button"
+                                    class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-semibold px-4 py-2.5 rounded-xl text-xs shadow-2xs transition flex items-center space-x-2">
+                                <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                                <span>Ekspor log</span>
+                            </button>
+                        </div>
 
-            <!-- Table & Filters Card -->
-            <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div class="w-full md:w-96">
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">CARI LOG</label>
-                        <div class="relative">
-                            <input type="text" x-model="logSearchQuery" placeholder="Pengguna, modul, atau keterangan"
-                                   class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-800">
-                            <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-xs"></i>
+                        <!-- Table & Filters Card -->
+                        <div class="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-5">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="w-full md:w-96">
+                                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">CARI LOG</label>
+                                    <div class="relative">
+                                        <input type="text" x-model="logSearchQuery" placeholder="Pengguna, modul, atau keterangan"
+                                               class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl pl-3.5 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-800">
+                                        <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-xs"></i>
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-1.5 self-end">
+                                    <template x-for="tab in ['Semua', 'Login', 'Tambah', 'Ubah', 'Hapus', 'Ekspor']" :key="tab">
+                                        <button type="button" @click="logActionFilter = tab"
+                                                class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
+                                                :class="logActionFilter === tab ? 'bg-[#1E293B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
+                                                x-text="tab"></button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                        <th class="pb-3 px-3 w-40">WAKTU</th>
+                                        <th class="pb-3 px-3 w-48">PENGGUNA</th>
+                                        <th class="pb-3 px-3 w-24">AKSI</th>
+                                        <th class="pb-3 px-3 w-40">MODUL</th>
+                                        <th class="pb-3 px-3">KETERANGAN</th>
+                                        <th class="pb-3 px-3 text-right w-32">ALAMAT IP</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    <template x-for="log in filteredLogs" :key="log.id">
+                                        <tr class="hover:bg-slate-50/80 transition-colors">
+                                            <td class="py-3.5 px-3 text-slate-500 whitespace-nowrap" x-text="log.waktu"></td>
+                                            <td class="py-3.5 px-3">
+                                                <div class="font-bold text-slate-900" x-text="log.pengguna"></div>
+                                                <div class="text-[11px] text-slate-500" x-text="log.peran"></div>
+                                            </td>
+                                            <td class="py-3.5 px-3">
+                                                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
+                                                      :class="{
+                                                          'bg-[#1E293B]': log.aksi === 'Ubah' || log.aksi === 'Login' || log.aksi === 'Ekspor',
+                                                          'bg-emerald-600': log.aksi === 'Tambah',
+                                                          'bg-red-600': log.aksi === 'Hapus'
+                                                      }"
+                                                      x-text="log.aksi"></span>
+                                            </td>
+                                            <td class="py-3.5 px-3 font-semibold text-slate-800" x-text="log.modul"></td>
+                                            <td class="py-3.5 px-3 text-slate-700 leading-relaxed" x-text="log.keterangan"></td>
+                                            <td class="py-3.5 px-3 text-right font-mono text-[11px] text-slate-500" x-text="log.ip"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-1.5 self-end">
-                        <template x-for="tab in ['Semua', 'Login', 'Tambah', 'Ubah', 'Hapus', 'Ekspor']" :key="tab">
-                            <button type="button" @click="logActionFilter = tab"
-                                    class="px-3.5 py-1.5 rounded-xl text-xs font-semibold transition"
-                                    :class="logActionFilter === tab ? 'bg-[#0B132B] text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'"
-                                    x-text="tab"></button>
-                        </template>
-                    </div>
-                </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs">
-                        <thead>
-                            <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                <th class="pb-3 px-3 w-40">WAKTU</th>
-                                <th class="pb-3 px-3 w-48">PENGGUNA</th>
-                                <th class="pb-3 px-3 w-24">AKSI</th>
-                                <th class="pb-3 px-3 w-40">MODUL</th>
-                                <th class="pb-3 px-3">KETERANGAN</th>
-                                <th class="pb-3 px-3 text-right w-32">ALAMAT IP</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <template x-for="log in filteredLogs" :key="log.id">
-                                <tr class="hover:bg-slate-50/80 transition-colors">
-                                    <td class="py-3.5 px-3 text-slate-500 whitespace-nowrap" x-text="log.waktu"></td>
-                                    <td class="py-3.5 px-3">
-                                        <div class="font-bold text-slate-900" x-text="log.pengguna"></div>
-                                        <div class="text-[11px] text-slate-500" x-text="log.peran"></div>
-                                    </td>
-                                    <td class="py-3.5 px-3">
-                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block"
-                                              :class="{
-                                                  'bg-[#0B132B]': log.aksi === 'Ubah' || log.aksi === 'Login' || log.aksi === 'Ekspor',
-                                                  'bg-emerald-600': log.aksi === 'Tambah',
-                                                  'bg-red-600': log.aksi === 'Hapus'
-                                              }"
-                                              x-text="log.aksi"></span>
-                                    </td>
-                                    <td class="py-3.5 px-3 font-semibold text-slate-800" x-text="log.modul"></td>
-                                    <td class="py-3.5 px-3 text-slate-700 leading-relaxed" x-text="log.keterangan"></td>
-                                    <td class="py-3.5 px-3 text-right font-mono text-[11px] text-slate-500" x-text="log.ip"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+                </main>
 
-        <!-- Footer -->
-        <footer class="mt-12 pt-6 border-t border-slate-200/80 text-xs text-slate-400">
-            Data pada tampilan ini adalah contoh untuk keperluan desain.
-        </footer>
-    </main>
+                <!-- =================== FOOTER (PERSIS footer.blade.php) =================== -->
+                <footer class="bg-white border-t border-gray-200 py-3 text-center text-xs text-gray-500">
+                    &copy; 2026 PT Yoke Food Industries Indonesia. All Rights Reserved — PPSI Kelompok 9 (SI-UNAND).
+                </footer>
+            </div>
 
-    <!-- Logout Modal -->
-    <div x-cloak x-show="showLogoutModal" 
-         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100" @click.away="showLogoutModal = false">
-            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl mb-4 mx-auto">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            </div>
-            <h3 class="text-base font-bold text-slate-900 text-center">Keluar dari Portal Admin?</h3>
-            <p class="text-xs text-slate-500 text-center mt-2 leading-relaxed">
-                Anda akan mengakhiri sesi simulasi administrator Rina Wulandari.
-            </p>
-            <div class="mt-6 flex space-x-3">
-                <button @click="showLogoutModal = false" type="button" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition">Batal</button>
-                <button @click="showLogoutModal = false; addToast('Berhasil keluar dari sesi simulasi.', 'info')" type="button" class="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow-md transition">Ya, Keluar</button>
-            </div>
         </div>
     </div>
 
@@ -1266,4 +1333,3 @@
 
 </body>
 </html>
-
