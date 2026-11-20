@@ -6,9 +6,13 @@
 
 <div class="p-6 space-y-6">
 
-    
-
-    
+    @if (! isset($distributor))
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center">
+        <i class="fa-solid fa-store-slash text-3xl text-slate-300"></i>
+        <h2 class="mt-3 text-lg font-bold text-slate-900">Belum ada distributor aktif</h2>
+        <p class="mt-1 text-sm text-slate-500">Tambahkan data distributor dengan status aktif terlebih dahulu untuk memakai modul E-PO.</p>
+    </div>
+    @else
 
     {{-- Hero --}}
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-wrap items-center justify-between gap-6">
@@ -268,5 +272,6 @@
             </table>
         </div>
     </div>
+    @endif
 </div>
 @endsection

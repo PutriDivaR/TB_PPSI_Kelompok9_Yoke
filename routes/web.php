@@ -3,6 +3,9 @@
 use App\Http\Controllers\AdminPortalController;
 use App\Http\Controllers\EPO\DistributorEPOController;
 use App\Http\Controllers\EPO\LogistikEPOController;
+use App\Http\Controllers\Klaim\DistributorKlaimController;
+use App\Http\Controllers\Klaim\LogistikKlaimController;
+use App\Http\Controllers\Klaim\SamKlaimController;
 use App\Http\Controllers\PelaporanController;
 use Illuminate\Support\Facades\Route;
 
@@ -78,10 +81,27 @@ Route::get('/monitoring', function () {
     return view('pages.monitoring.index');
 })->name('monitoring.index');
 
-// Route Sementara Modul Klaim (PJ: Farhan)
-Route::get('/klaim', function () {
-    return view('pages.klaim.index');
-})->name('klaim.index');
+// Modul Klaim & Retur (PJ: Farhan)
+Route::prefix('klaim')->name('klaim.')->group(function () {
+    // ---------------- DISTRIBUTOR ----------------
+    Route::prefix('distributor')->name('distributor.')->controller(DistributorKlaimController::class)->group(function () {
+        Route::get('/beranda', 'beranda')->name('beranda')->defaults('role', 'distributor');
+        Route::get('/ajukan', 'ajukan')->name('ajukan')->defaults('role', 'distributor');
+        Route::get('/detail/{klaim}', 'detail')->whereNumber('klaim')->name('detail')->defaults('role', 'distributor');
+    });
+
+    // ---------------- SALES AREA MANAGER ----------------
+    Route::prefix('sam')->name('sam.')->controller(SamKlaimController::class)->group(function () {
+        Route::get('/antrean', 'antrean')->name('antrean')->defaults('role', 'sam');
+        Route::get('/verifikasi/{klaim}', 'verifikasi')->whereNumber('klaim')->name('verifikasi')->defaults('role', 'sam');
+        Route::get('/pengesahan/{klaim}', 'pengesahan')->whereNumber('klaim')->name('pengesahan')->defaults('role', 'sam');
+    });
+
+    // ---------------- LOGISTIK PUSAT ----------------
+    Route::prefix('logistik')->name('logistik.')->controller(LogistikKlaimController::class)->group(function () {
+        Route::get('/proses', 'proses')->name('proses')->defaults('role', 'logistik');
+    });
+});
 
 // Route Sementara Modul Pelaporan (PJ: Hasbi)
 Route::get('/pelaporan', [PelaporanController::class, 'index'])->name('pelaporan.index');
