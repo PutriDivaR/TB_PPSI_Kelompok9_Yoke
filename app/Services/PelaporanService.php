@@ -63,6 +63,7 @@ class PelaporanService
 
             return [
                 'id_distributor' => $distributor,
+                'id_produk' => $product,
                 'distributor' => $distributors[$distributor]->nama,
                 'wilayah' => $distributors[$distributor]->wilayah?->nama_wilayah,
                 'produk' => $products[$product]->nama_produk,

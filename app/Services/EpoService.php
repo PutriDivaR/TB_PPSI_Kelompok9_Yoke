@@ -25,33 +25,26 @@ class EpoService
     }
 
     // Logika perhitungan rekomendasi (Sell-out 3 bulan terakhir - stok layak jual) / karton_per_kontainer
-    public static function hitungRekomendasi($distributorId, $periode): array
+    public static function hitungRekomendasi(int $distributorId, string $periode): array
     {
         $carbonPeriode = Carbon::parse($periode);
         $startDate = $carbonPeriode->copy()->subMonths(3)->startOfMonth();
         $endDate = $carbonPeriode->copy()->subMonth()->endOfMonth();
-
-        $produks = Produk::all();
+        $sellOutByProduct = SellOut::query()->where('id_distributor', $distributorId)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->selectRaw('id_produk, SUM(jumlah) AS total')
+            ->groupBy('id_produk')->pluck('total', 'id_produk');
+        $stockByProduct = StokGudang::query()->where('id_distributor', $distributorId)
+            ->whereDate('periode', '<=', $endDate->toDateString())
+            ->orderByDesc('periode')->get()->unique('id_produk')->keyBy('id_produk');
+        $produks = Produk::query()->orderBy('kode_sku')->get();
         $rekomendasi = [];
 
         foreach ($produks as $produk) {
-            // Total Sell Out 3 bulan terakhir
-            $totalSellOut = SellOut::where('id_distributor', $distributorId)
-                ->where('id_produk', $produk->id_produk)
-                ->whereBetween('tanggal', [$startDate, $endDate])
-                ->sum('jumlah');
-
+            $totalSellOut = (int) $sellOutByProduct->get($produk->id_produk, 0);
             $rataRataSellOut = $totalSellOut / 3;
-
-            // Stok layak jual terbaru
-            $stok = StokGudang::where('id_distributor', $distributorId)
-                ->where('id_produk', $produk->id_produk)
-                ->orderBy('periode', 'desc')
-                ->first();
-
+            $stok = $stockByProduct->get($produk->id_produk);
             $stokLayak = $stok ? $stok->stok_layak_jual : 0;
-
-            // Rekomendasi dalam kontainer
             $kebutuhanKarton = max(0, $rataRataSellOut - $stokLayak);
             $rekomendasiKontainer = ceil($kebutuhanKarton / $produk->karton_per_kontainer);
 
