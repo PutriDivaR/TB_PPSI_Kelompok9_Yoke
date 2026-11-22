@@ -42,8 +42,8 @@
                         <i class="fa-solid fa-file-invoice-dollar w-4 {{ request()->routeIs('simulation.distributor', 'e-po.distributor.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>E-PO (Purchase Order)</span>
                     </a>
-                    <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-truck-fast w-4 text-slate-400"></i>
+                    <a href="{{ route('monitoring.index') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('monitoring.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
+                        <i class="fa-solid fa-truck-fast w-4 {{ request()->routeIs('monitoring.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Monitoring Pengiriman</span>
                     </a>
                     <a href="{{ route('klaim.distributor.beranda') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('klaim.distributor.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
@@ -63,8 +63,8 @@
                         <i class="fa-solid fa-check-double w-4 {{ request()->routeIs('simulation.logistik', 'e-po.logistik.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Antrean Forecast & E-PO</span>
                     </a>
-                    <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-location-dot w-4 text-slate-400"></i>
+                    <a href="{{ route('monitoring.index') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('monitoring.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
+                        <i class="fa-solid fa-location-dot w-4 {{ request()->routeIs('monitoring.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Update Milestone & ETA</span>
                     </a>
                     <a href="{{ route('klaim.logistik.proses') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('klaim.logistik.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
@@ -83,6 +83,10 @@
                     <a href="{{ route('klaim.sam.antrean') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('klaim.sam.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
                         <i class="fa-solid fa-pen-nib w-4 {{ request()->routeIs('klaim.sam.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Verifikasi & E-Sign BAK</span>
+                    </a>
+                    <a href="{{ route('monitoring.index') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('monitoring.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
+                        <i class="fa-solid fa-truck-fast w-4 {{ request()->routeIs('monitoring.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
+                        <span>Monitoring Pengiriman Area</span>
                     </a>
                     <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
                         <i class="fa-solid fa-chart-pie w-4 text-slate-400"></i>

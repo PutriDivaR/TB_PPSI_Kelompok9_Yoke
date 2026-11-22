@@ -6,6 +6,7 @@ use App\Http\Controllers\EPO\LogistikEPOController;
 use App\Http\Controllers\Klaim\DistributorKlaimController;
 use App\Http\Controllers\Klaim\LogistikKlaimController;
 use App\Http\Controllers\Klaim\SamKlaimController;
+use App\Http\Controllers\Monitoring\MonitoringPengirimanController;
 use App\Http\Controllers\PelaporanController;
 use Illuminate\Support\Facades\Route;
 
@@ -76,10 +77,14 @@ Route::prefix('e-po')->name('e-po.')->group(function () {
     });
 });
 
-// Route Sementara Modul Monitoring (PJ: Riski/Tamuzaki)
-Route::get('/monitoring', function () {
-    return view('pages.monitoring.index');
-})->name('monitoring.index');
+// Modul Monitoring Pengiriman (PJ: Riski)
+Route::prefix('monitoring')->name('monitoring.')->controller(MonitoringPengirimanController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::get('/detail/{id}', 'detail')->name('detail');
+    Route::get('/update/{id}', 'updateStatus')->name('update');
+    Route::post('/milestone/{id}', 'storeMilestone')->name('milestone.store');
+    Route::get('/konfirmasi/{id}', 'konfirmasi')->name('konfirmasi');
+});
 
 // Modul Klaim & Retur (PJ: Farhan)
 Route::prefix('klaim')->name('klaim.')->group(function () {

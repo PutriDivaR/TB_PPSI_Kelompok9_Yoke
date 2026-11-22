@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-
 class AdminPortalController extends Controller
 {
     /**
@@ -145,4 +143,3 @@ class AdminPortalController extends Controller
         ]);
     }
 }
-
