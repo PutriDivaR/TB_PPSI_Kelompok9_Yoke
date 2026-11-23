@@ -2,7 +2,8 @@
 
 namespace App\Providers;
 
-use Carbon\CarbonInterface;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -20,8 +21,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        view()->share('tanggalEpo', function (?CarbonInterface $tanggal = null, string $format = 'd F Y'): string {
-            return $tanggal ? $tanggal->copy()->locale('id')->translatedFormat($format) : '-';
+        View::share('tanggalEpo', function ($tanggal, $format = 'd F Y') {
+            return $tanggal
+                ? Carbon::parse($tanggal)->locale('id')->translatedFormat($format)
+                : '-';
         });
     }
 }

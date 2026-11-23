@@ -50,6 +50,18 @@ class ForecastController extends Controller
     public function recommendations(Request $request): JsonResponse
     {
         $period = $request->validate(['periode' => ['required', 'date_format:Y-m']])['periode'];
+        $periodDate = CarbonImmutable::createFromFormat('!Y-m', $period);
+        $minimumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
+            CarbonImmutable::now()->day > 15 ? 3 : 2
+        );
+        $maximumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
+            CarbonImmutable::now()->day > 15 ? 7 : 6
+        );
+        if ($periodDate->lessThan($minimumPeriod) || $periodDate->greaterThan($maximumPeriod)) {
+            throw ValidationException::withMessages([
+                'periode' => ['Rekomendasi hanya tersedia untuk periode '.$minimumPeriod->translatedFormat('F Y').' sampai '.$maximumPeriod->translatedFormat('F Y').' (rolling lead time 2-3 bulan).'],
+            ]);
+        }
         $user = $request->user();
         abort_unless($user->id_distributor, 422, 'Akun tidak terhubung ke perusahaan Distributor.');
 
@@ -71,6 +83,17 @@ class ForecastController extends Controller
             'submit' => ['sometimes', 'boolean'],
         ]);
         $period = CarbonImmutable::createFromFormat('!Y-m', $values['periode']);
+        $minimumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
+            CarbonImmutable::now()->day > 15 ? 3 : 2
+        );
+        $maximumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
+            CarbonImmutable::now()->day > 15 ? 7 : 6
+        );
+        if ($period->lessThan($minimumPeriod) || $period->greaterThan($maximumPeriod)) {
+            throw ValidationException::withMessages([
+                'periode' => ['Forecast hanya boleh untuk periode '.$minimumPeriod->translatedFormat('F Y').' sampai '.$maximumPeriod->translatedFormat('F Y').' (rolling lead time 2-3 bulan).'],
+            ]);
+        }
         $fiscalYear = TahunFiskal::query()->whereDate('tanggal_mulai', '<=', $period->endOfMonth())
             ->whereDate('tanggal_selesai', '>=', $period->startOfMonth())->first();
         abort_unless($fiscalYear, 422, 'Periode tidak berada dalam tahun fiskal yang terdaftar.');

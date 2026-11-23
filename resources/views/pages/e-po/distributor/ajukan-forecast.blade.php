@@ -3,55 +3,70 @@
 @section('title', 'Ajukan Forecast')
 
 @section('content')
+<div class="space-y-6" x-data="forecastForm(@js($baris), {{ $kapasitas }}, {{ $editable ? 'true' : 'false' }}, {{ $kartonPerKontainer }})">
 
-<div class="p-6 space-y-6"
-     x-data="{
-        rows: {{ \Illuminate\Support\Js::from($baris) }},
-        q: '',
-        kapasitas: {{ $kapasitas }},
-        agree: false,
-        editable: {{ $editable ? 'true' : 'false' }},
-        fmt(n) { return new Intl.NumberFormat('id-ID').format(n) },
-        step(r, d) { r.usulan = Math.max(0, Number(r.usulan || 0) + d) },
-        add(r) { r.selected = true; r.usulan = r.rekomendasi },
-        remove(r) { r.selected = false; r.usulan = 0 },
-        get selectedRows() { return this.rows.filter(r => r.selected) },
-        get searchRows() { return this.rows.filter(r => !r.selected && (r.kode + ' ' + r.nama).toLowerCase().includes(this.q.toLowerCase())) },
-        get totalRek() { return this.selectedRows.reduce((a, r) => a + r.rekomendasi, 0) },
-        get total() { return this.selectedRows.reduce((a, r) => a + Number(r.usulan || 0), 0) },
-        get karton() { return this.selectedRows.reduce((a, r) => a + Number(r.usulan || 0) * r.kpk, 0) },
-        get nilai() { return this.selectedRows.reduce((a, r) => a + Number(r.usulan || 0) * r.kpk * r.harga, 0) },
-        get selisih() { return this.totalRek > 0 ? ((this.total / this.totalRek - 1) * 100).toFixed(1) : null },
-        get pct() { return Math.min(100, Math.round(this.total / this.kapasitas * 100)) }
-     }">
+    {{-- HEADER + STEPPER --}}
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+            <div class="w-11 h-11 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-lg"><i class="fa-solid fa-store"></i></div>
+            <div>
+                <p class="text-[10px] font-bold tracking-wider uppercase text-slate-500">Distributor Regional &middot; DST-{{ str_pad($distributor->id_distributor, 3, '0', STR_PAD_LEFT) }}</p>
+                <h1 class="text-lg font-bold text-slate-900 leading-tight">{{ $distributor->nama }} ({{ $distributor->wilayah->nama_wilayah }})</h1>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-4">
+            <form method="POST" action="{{ route('e-po.distributor.konteks') }}" class="flex items-center gap-2">
+                @csrf
+                <label for="ctx-distributor" class="text-[10px] font-bold uppercase text-slate-400">Perusahaan simulasi</label>
+                <select id="ctx-distributor" name="id_distributor" onchange="this.form.submit()" class="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white">
+                    @foreach ($daftarDistributor as $d)
+                        <option value="{{ $d->id_distributor }}" @selected($d->id_distributor === $distributor->id_distributor)>{{ $d->nama }}</option>
+                    @endforeach
+                </select>
+            </form>
+            @php $langkah = ['Usulan Forecast', 'Input E-PO', 'Dokumen PO Selesai']; $aktif = 1; @endphp
+            <ol class="flex items-center gap-2 text-xs">
+                @foreach ($langkah as $i => $label)
+                    @php $n = $i + 1; @endphp
+                    <li class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold {{ $n < $aktif ? 'bg-emerald-500 text-white' : ($n == $aktif ? 'bg-red-600 text-white ring-4 ring-red-100' : 'bg-slate-200 text-slate-500') }}">
+                            @if ($n < $aktif) <i class="fa-solid fa-check text-[10px]"></i> @else {{ $n }} @endif
+                        </span>
+                        <span class="{{ $n == $aktif ? 'font-bold text-slate-900' : 'text-slate-500' }}">{{ $label }}</span>
+                        @if (! $loop->last) <span class="w-8 h-px bg-slate-300"></span> @endif
+                    </li>
+                @endforeach
+            </ol>
+        </div>
+    </div>
 
-    
-
-    
+    @include('layouts.partials.flash')
 
     <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
-            <h2 class="text-xl font-bold text-slate-900">Formulir Usulan & Penyesuaian Forecast Bulanan</h2>
-            <p class="text-xs text-slate-500">Periode forecast: {{ $tanggalEpo($periode, 'F Y') }} - batas pengajuan {{ $tanggalEpo($tenggat, 'd M Y, H.i') }} WIB</p>
+            <h2 class="text-xl font-bold text-slate-900">Forecast Kebutuhan Periode Mendatang</h2>
+            <p class="text-xs text-slate-500">
+                Periode forecast: {{ $tanggalEpo($periode, 'F Y') }} &middot;
+                batas pengajuan {{ $tanggalEpo($tenggat, 'd M Y, H.i') }} WIB &middot;
+                1 forecast = kebutuhan 1 bulan target kedatangan; dapat direncanakan hingga 5 bulan ke depan
+            </p>
         </div>
         @if ($forecast)
-            @php
-                $status = match ($forecast->status ?? 'Draft') {
-                    'Draft' => ['Draft', 'bg-slate-100 text-slate-700'],
-                    'Diajukan' => ['Menunggu penetapan', 'bg-amber-50 text-amber-700'],
-                    'Diproses' => ['Sedang diproses', 'bg-blue-50 text-blue-700'],
-                    'Disetujui' => ['Disetujui', 'bg-emerald-50 text-emerald-700'],
-                    default => [$forecast->status ?? 'Forecast baru', 'bg-slate-100 text-slate-700'],
-                };
-            @endphp
-            <span class="inline-flex text-[10px] font-bold px-2 py-1 rounded {{ $status[1] }}">{{ $status[0] }}</span>
+            @php $bf = $badge($forecast->status, 'forecast'); @endphp
+            <span class="inline-block rounded px-2 py-1 text-[10px] font-bold {{ $bf['class'] }}">&#9679; {{ $bf['label'] }}</span>
         @endif
     </div>
 
     @unless ($editable)
-        <div class="rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs px-4 py-3">
-            <i class="fa-solid fa-lock mr-2"></i>Forecast ini sudah diajukan sehingga ditampilkan hanya-baca.
-            <a href="{{ route('e-po.distributor.hitung-forecast') }}" class="font-bold text-red-600 hover:underline ml-1">Kembali ke Hitung Forecast</a>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            <i class="fa-solid fa-lock mr-2"></i>
+            @if (! $bisaMengajukanPeriode)
+                Periode {{ $tanggalEpo($periode, 'F Y') }} sudah lewat sehingga forecast ditampilkan hanya-baca dan tidak dapat diubah.
+            @else
+                Forecast ini sudah diajukan sehingga ditampilkan hanya-baca.
+                @if ($bisaDibatalkan) Anda masih dapat membatalkannya selama Logistik belum memprosesnya. @endif
+            @endif
+            <a href="{{ route('e-po.distributor.hitung-forecast', ['periode' => $periode->format('Y-m')]) }}" class="ml-1 font-bold text-red-600 hover:underline">Kembali ke Hitung Forecast</a>
         </div>
     @endunless
 
@@ -59,124 +74,88 @@
         @csrf
         <input type="hidden" name="periode" value="{{ $periode->format('Y-m') }}">
 
-        {{-- Ringkasan --}}
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        {{-- RINGKASAN --}}
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Rekomendasi Sistem</p>
-                <p class="mt-2 text-2xl font-extrabold text-slate-900"><span x-text="fmt(totalRek)"></span> <span class="text-xs text-slate-500">Kontainer</span></p>
-                <p class="text-[10px] text-slate-500">Rata-rata Sell-Out {{ $jumlahBulan }} bulan + stok pengaman</p>
+                <p class="mt-2 text-2xl font-extrabold text-slate-900"><span x-text="fmt(totalRek)"></span> <span class="text-xs text-slate-500">Karton</span></p>
+                <p class="text-[10px] text-slate-500">Sell-Out {{ $jumlahBulan }} bln + stok pengaman</p>
             </div>
-            <div class="bg-red-50 rounded-xl border border-red-200 p-4 shadow-sm">
-                <div class="flex justify-between items-start">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-red-600">Total Usulan Distributor</p>
-                    <span x-show="selisih !== null && Number(selisih) !== 0" style="display:none" class="text-[10px] font-bold bg-red-600 text-white px-1.5 rounded"
-                          x-text="(selisih > 0 ? '+' : '') + selisih + '%'"></span>
-                </div>
-                <p class="mt-2 text-2xl font-extrabold text-slate-900"><span x-text="fmt(total)"></span> <span class="text-xs text-slate-500">Kontainer</span></p>
-                <p class="text-[10px] text-red-600">Setara <span x-text="fmt(karton)"></span> karton</p>
+            <div class="rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-red-600">Total Usulan Distributor</p>
+                <p class="mt-2 text-2xl font-extrabold text-slate-900"><span x-text="fmt(total)"></span> <span class="text-xs text-slate-500">Karton</span></p>
+                <p class="text-[10px] text-red-600"><span x-text="terisi"></span> SKU terisi &middot; &asymp; <span x-text="fmt2(total / kpk)"></span> kontainer</p>
             </div>
-            <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Estimasi Nilai Pesanan</p>
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Estimasi Nilai Pengajuan</p>
                 <p class="mt-2 text-xl font-extrabold text-slate-900">Rp <span x-text="fmt(nilai)"></span></p>
-                <p class="text-[10px] text-slate-500">Harga produk x karton</p>
+                <p class="text-[10px] text-slate-500">Harga produk &times; karton</p>
             </div>
-            <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Kapasitas Pabrik / Bulan</p>
-                <p class="mt-2 text-xl font-extrabold text-slate-900">{{ number_format($kapasitas, 0, ',', '.') }} <span class="text-xs text-slate-500">Kontainer</span></p>
-                <div class="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="h-full rounded-full" :class="pct > 60 ? 'bg-amber-500' : 'bg-emerald-500'" :style="`width:${pct}%`"></div></div>
-                <p class="text-[10px] text-slate-500 mt-1">Usulan Anda = <span x-text="pct"></span>% kapasitas</p>
+                <p class="mt-2 text-xl font-extrabold text-slate-900">{{ number_format($kapasitas, 0, ',', '.') }} <span class="text-xs text-slate-500">Karton</span></p>
+                <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full" :class="pct > 60 ? 'bg-amber-500' : 'bg-emerald-500'" :style="`width:${pct}%`"></div></div>
+                <p class="mt-1 text-[10px] text-slate-500">Usulan Anda = <span x-text="pct"></span>% kapasitas</p>
             </div>
         </div>
 
-        {{-- Tabel --}}
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-            <div class="px-5 py-4 border-b border-slate-100">
-                <div class="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-900">Rincian SKU Usulan Forecast
-                            <span class="ml-2 text-[10px] bg-slate-100 px-2 py-0.5 rounded"><span x-text="selectedRows.length"></span> Produk Dipilih</span>
-                        </h3>
-                        <p class="text-[11px] text-slate-500">Kebutuhan dihitung dalam karton, lalu dibulatkan ke kemasan kontainer. Satuan usulan tetap kontainer sesuai kapasitas pabrik.</p>
-                    </div>
-                    @if ($editable)
-                        <div class="relative min-w-[280px]">
-                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-xs text-slate-400"></i>
-                            <input type="search" x-model="q" placeholder="Cari kode atau nama produk..." class="w-full rounded-lg border border-slate-300 py-2 pl-8 pr-3 text-xs">
-                        </div>
-                    @endif
+        {{-- TABEL SEMUA SKU --}}
+        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900">Rincian SKU Usulan Forecast <span class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[10px]">{{ count($baris) }} SKU Aktif</span></h3>
+                    <p class="text-[11px] text-slate-500">Isi hanya SKU yang dibutuhkan; SKU lain biarkan 0 (tidak ikut dikirim).</p>
                 </div>
                 @if ($editable)
-                    <div x-show="q.length > 0" class="mt-3 max-h-52 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-                        <template x-for="r in searchRows" :key="'catalog-'+r.id">
-                            <button type="button" @click="add(r); q=''" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50">
-                                <span>
-                                    <span class="font-mono text-[11px] font-bold text-red-600" x-text="r.kode"></span>
-                                    <span class="ml-2 text-xs font-semibold text-slate-900" x-text="r.nama"></span>
-                                </span>
-                                <span class="text-[10px] font-bold text-emerald-700">Tambah - rekomendasi <span x-text="fmt(r.rekomendasi)"></span> ktr</span>
-                            </button>
-                        </template>
-                        <p x-show="searchRows.length === 0" class="px-3 py-3 text-xs text-slate-500">Tidak ada produk yang cocok atau produk sudah dipilih.</p>
+                    <div class="flex gap-2">
+                        <button type="button" @click="pakaiSemua()" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1 text-red-600"></i>Terapkan Semua Rekomendasi
+                        </button>
+                        <button type="button" @click="kosongkan()" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">Kosongkan</button>
                     </div>
                 @endif
             </div>
-            <table class="w-full text-sm min-w-[950px]">
+            <table class="w-full min-w-[980px] text-sm">
                 <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
                     <tr>
                         <th class="px-4 py-3 text-left">Kode SKU</th>
                         <th class="px-4 py-3 text-left">Nama Produk</th>
-                        <th class="px-4 py-3 text-right">Rata-rata Sell-Out / Bln</th>
+                        <th class="px-4 py-3 text-right">Sell-Out / Bln</th>
                         <th class="px-4 py-3 text-right">Stok Layak Jual</th>
                         <th class="px-4 py-3 text-right">Rekomendasi</th>
-                        <th class="px-4 py-3 text-center">Usulan (Kontainer)</th>
-                        <th class="px-4 py-3 text-right">Setara Karton</th>
+                        <th class="px-4 py-3 text-center">Usulan (Karton)</th>
                         <th class="px-4 py-3 text-right">Estimasi Nilai</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    <template x-for="r in selectedRows" :key="r.id">
-                        <tr class="hover:bg-slate-50">
+                    <template x-for="r in rows" :key="r.id">
+                        <tr :class="Number(r.usulan) > 0 ? 'bg-red-50/30' : 'hover:bg-slate-50'">
                             <td class="px-4 py-3 font-mono text-[11px] font-bold text-red-600" x-text="r.kode"></td>
-                            <td class="px-4 py-3">
-                                <p class="font-semibold text-slate-900" x-text="r.nama"></p>
-                                <p class="text-[10px] text-slate-500"><span x-text="r.kategori || '-'"></span> - <span x-text="fmt(r.kpk)"></span> karton/kontainer</p>
-                                <button type="button" x-show="editable" @click="remove(r)" class="mt-1 text-[10px] font-semibold text-slate-400 hover:text-red-600">
-                                    <i class="fa-solid fa-xmark mr-1"></i>Hapus dari pilihan
-                                </button>
-                            </td>
-                            <td class="px-4 py-3 text-right text-slate-600"><span x-text="fmt(r.rata_rata)"></span> krt</td>
-                            <td class="px-4 py-3 text-right text-slate-600"><span x-text="fmt(r.stok)"></span> krt</td>
-                            <td class="px-4 py-3 text-right font-semibold">
-                                <span x-text="fmt(r.rekomendasi)"></span> ktr
-                                <p class="text-[10px] font-normal text-slate-500"><span x-text="fmt(r.kebutuhan_karton)"></span> krt kebutuhan</p>
+                            <td class="px-4 py-3"><p class="font-semibold text-slate-900" x-text="r.nama"></p><p class="text-[10px] text-slate-500" x-text="r.kategori || '-'"></p></td>
+                            <td class="px-4 py-3 text-right text-slate-600" x-text="fmt(r.rata_rata)"></td>
+                            <td class="px-4 py-3 text-right text-slate-600" x-text="fmt(r.stok)"></td>
+                            <td class="px-4 py-3 text-right">
+                                <span class="font-semibold" x-text="fmt(r.rekomendasi)"></span>
+                                <button type="button" x-show="editable && r.rekomendasi > 0" @click="r.usulan = r.rekomendasi" class="ml-1 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 hover:bg-red-50">pakai</button>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center justify-center gap-1">
-                                    <button type="button" x-show="editable" @click="step(r, -1)" class="w-7 h-7 rounded border border-slate-200 hover:bg-slate-100"><i class="fa-solid fa-minus text-[10px]"></i></button>
+                                    <button type="button" x-show="editable" @click="step(r, -100)" class="h-7 w-7 rounded border border-slate-200 hover:bg-slate-100"><i class="fa-solid fa-minus text-[10px]"></i></button>
                                     <input type="number" min="0" step="1" x-model.number="r.usulan" :name="`usulan[${r.id}]`" :readonly="!editable"
-                                           class="w-20 text-center text-sm font-bold border border-slate-200 rounded py-1 focus:ring-red-500 focus:border-red-500"
-                                           :class="r.usulan > r.rekomendasi ? 'text-red-600 bg-red-50' : ''">
-                                    <button type="button" x-show="editable" @click="step(r, 1)" class="w-7 h-7 rounded border border-slate-200 hover:bg-slate-100"><i class="fa-solid fa-plus text-[10px]"></i></button>
+                                           class="w-24 rounded border border-slate-200 py-1 text-center text-sm font-bold focus:border-red-500 focus:ring-red-500"
+                                           :class="Number(r.usulan) > r.rekomendasi && r.rekomendasi > 0 ? 'text-red-600' : ''">
+                                    <button type="button" x-show="editable" @click="step(r, 100)" class="h-7 w-7 rounded border border-slate-200 hover:bg-slate-100"><i class="fa-solid fa-plus text-[10px]"></i></button>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-right text-slate-600" x-text="fmt(Number(r.usulan || 0) * r.kpk)"></td>
-                            <td class="px-4 py-3 text-right font-semibold" x-text="'Rp ' + fmt(Number(r.usulan || 0) * r.kpk * r.harga)"></td>
+                            <td class="px-4 py-3 text-right font-semibold" x-text="'Rp ' + fmt(Number(r.usulan || 0) * r.harga)"></td>
                         </tr>
                     </template>
-                    <tr x-show="selectedRows.length === 0">
-                        <td colspan="8" class="px-4 py-10 text-center">
-                            <i class="fa-solid fa-box-open text-2xl text-slate-300"></i>
-                            <p class="mt-2 text-sm font-semibold text-slate-700">Belum ada produk dipilih</p>
-                            <p class="mt-1 text-xs text-slate-500">Gunakan pencarian katalog di atas untuk menambahkan SKU.</p>
-                        </td>
-                    </tr>
                 </tbody>
                 <tfoot class="bg-slate-50 font-bold text-slate-900">
                     <tr>
                         <td colspan="4" class="px-4 py-3 text-xs uppercase">Total Rekapitulasi Usulan Cabang</td>
-                        <td class="px-4 py-3 text-right"><span x-text="fmt(totalRek)"></span> ktr</td>
-                        <td class="px-4 py-3 text-center text-red-600"><span x-text="fmt(total)"></span> ktr</td>
-                        <td class="px-4 py-3 text-right" x-text="fmt(karton)"></td>
+                        <td class="px-4 py-3 text-right" x-text="fmt(totalRek)"></td>
+                        <td class="px-4 py-3 text-center text-red-600"><span x-text="fmt(total)"></span> krt</td>
                         <td class="px-4 py-3 text-right">Rp <span x-text="fmt(nilai)"></span></td>
                     </tr>
                 </tfoot>
@@ -184,25 +163,51 @@
         </div>
 
         @if ($editable)
-            <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4">
-                <label class="flex items-start gap-3 max-w-3xl cursor-pointer">
+            <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <label class="flex max-w-3xl cursor-pointer items-start gap-3">
                     <input type="checkbox" name="konfirmasi" value="1" x-model="agree" class="mt-1 rounded border-slate-300 text-red-600 focus:ring-red-500">
                     <span class="text-xs text-slate-600">
-                        <b class="text-slate-900">Konfirmasi Kebenaran Data Cabang & Kemampuan Gudang.</b><br>
+                        <b class="text-slate-900">Konfirmasi Kebenaran Data Cabang &amp; Kemampuan Gudang.</b><br>
                         Saya menyatakan usulan di atas disusun berdasarkan kondisi riil cabang dan kapasitas gudang untuk periode {{ $tanggalEpo($periode, 'F Y') }}.
                     </span>
                 </label>
                 <div class="flex gap-3">
-                    <button type="submit" name="aksi" value="draft" class="px-4 py-2.5 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50">
-                        <i class="fa-regular fa-floppy-disk mr-1"></i> Simpan Draft
-                    </button>
-                    <button type="submit" name="aksi" value="kirim" :disabled="!agree || total < 1"
-                            class="px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed">
-                        <i class="fa-solid fa-paper-plane mr-1"></i> Submit Forecast
-                    </button>
+                    <button type="submit" name="aksi" value="draft" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50"><i class="fa-regular fa-floppy-disk mr-1"></i> Simpan Draft</button>
+                    <button type="submit" name="aksi" value="kirim" :disabled="!agree || terisi < 1"
+                            class="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"><i class="fa-solid fa-paper-plane mr-1"></i> Submit Forecast</button>
                 </div>
             </div>
         @endif
     </form>
+
+    @if ($bisaDibatalkan)
+        <form method="POST" action="{{ route('e-po.distributor.hapus-forecast', $forecast) }}" class="flex justify-end"
+              onsubmit="return confirm('{{ $forecast->status === 'Draft' ? 'Hapus draft forecast ini?' : 'Batalkan pengajuan forecast ini? Data usulan akan dihapus.' }}')">
+            @csrf @method('DELETE')
+            <button type="submit" class="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50">
+                <i class="fa-regular fa-trash-can mr-1"></i> {{ $forecast->status === 'Draft' ? 'Hapus Draft Forecast' : 'Batalkan Pengajuan Forecast' }}
+            </button>
+        </form>
+    @endif
 </div>
+
+@push('scripts')
+<script>
+    function forecastForm(rows, kapasitas, editable, kpk) {
+        return {
+            rows, kapasitas, editable, kpk, agree: false,
+            fmt(n) { return new Intl.NumberFormat('id-ID').format(Math.round(Number(n) || 0)); },
+            fmt2(n) { return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(Number(n) || 0); },
+            step(r, d) { r.usulan = Math.max(0, Number(r.usulan || 0) + d); },
+            pakaiSemua() { this.rows.forEach(r => { r.usulan = r.rekomendasi; }); },
+            kosongkan() { this.rows.forEach(r => { r.usulan = 0; }); },
+            get totalRek() { return this.rows.reduce((a, r) => a + r.rekomendasi, 0); },
+            get total() { return this.rows.reduce((a, r) => a + Number(r.usulan || 0), 0); },
+            get terisi() { return this.rows.filter(r => Number(r.usulan || 0) > 0).length; },
+            get nilai() { return this.rows.reduce((a, r) => a + Number(r.usulan || 0) * r.harga, 0); },
+            get pct() { return Math.min(100, Math.round(this.total / this.kapasitas * 100)); },
+        };
+    }
+</script>
+@endpush
 @endsection
