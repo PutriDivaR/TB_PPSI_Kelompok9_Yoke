@@ -15,6 +15,10 @@ class ClaimResource extends JsonResource
             'status' => $this->status,
             'submitted_at' => $this->tanggal_pengajuan,
             'completed_at' => $this->tanggal_penyelesaian,
+            'visit_date' => $this->jadwal_kunjungan?->toDateString(),
+            'return_note' => $this->catatan_pengembalian,
+            'resolution_type' => $this->bentuk_penyelesaian,
+            'resolution_note' => $this->catatan_penyelesaian,
             'receipt' => $this->whenLoaded('penerimaan', fn () => [
                 'id' => $this->penerimaan->id_penerimaan,
                 'received_at' => $this->penerimaan->tanggal_terima,
@@ -34,8 +38,11 @@ class ClaimResource extends JsonResource
                 'quantity' => $item->jumlah,
                 'responsible_party' => $item->penanggung_jawab,
                 'verification_status' => $item->status_verifikasi,
+                'verified_quantity' => $item->jumlah_terverifikasi,
+                'verification_note' => $item->catatan_verifikasi,
                 'photos' => $item->fotoBuktiRecords->map(fn ($photo) => [
                     'id' => $photo->id_foto,
+                    'source' => $photo->sumber ?? 'Distributor',
                     'url' => route('api.v1.claims.photos.show', [$this->id_klaim, $photo->id_foto]),
                 ])->values(),
             ])->values()),

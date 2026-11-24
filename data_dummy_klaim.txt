@@ -1,0 +1,86 @@
+-- =====================================================================
+-- DATA DUMMY MODUL KLAIM & RETUR  |  Database: yoke_ppsi  |  MySQL 8.x
+-- Syarat: data_dummy_epo.txt sudah diimpor dan patch skema
+--         database/schema/patch_2026_11_klaim.sql sudah dijalankan.
+--         Tabel pengiriman, penerimaan_barang, dan klaim masih kosong.
+-- Cara pakai: mysql -u root yoke_ppsi < data_dummy_klaim.txt
+--
+-- Satuan: karton. 1 kontainer = 2.000 karton (4 SKU x 500 karton).
+-- Skenario (tanggal sistem sekitar 24 Nov 2026):
+--   Kedatangan tanpa klaim -> bisa diajukan di "Ajukan Klaim Baru":
+--     PT Minang Niaga Jaya  : SEGU 2240718 (tiba 20 Nov)
+--     PT Tirta Niaga Mandiri: TEMU 6038214 (tiba 14 Nov)
+--   KLM-00001 Minang  MRKU 4821937 : Menunggu Verifikasi SAM (jadwal 25 Nov)
+--   KLM-00002 Minang  TCNU 7702154 : Diteruskan ke Logistik, BAK-00001
+--   KLM-00003 Tirta   BMOU 2871450 : Menunggu Verifikasi SAM (jadwal 24 Nov)
+--   KLM-00004 Tirta   CAIU 7340195 : Selesai (Ganti Rugi), BAK-00002
+--   KLM-00005 Tirta   SEGU 5172093 : Dikembalikan ke distributor
+-- Klaim contoh tidak memiliki foto bukti. Gambar tanda tangan BAK contoh
+-- dibuat terpisah (lihat catatan di akhir file).
+-- =====================================================================
+USE yoke_ppsi;
+
+INSERT INTO `pengiriman` (`id_pengiriman`, `id_po`, `nomor_kontainer`, `nama_vessel`, `eta_awal`, `eta_terkini`, `status`) VALUES
+  (1, 3, 'MRKU 4821937', 'KM Meratus Padang', '2026-11-14', '2026-11-16', 'Diterima'),
+  (2, 3, 'TCNU 7702154', 'KM Meratus Padang', '2026-11-08', '2026-11-09', 'Diterima'),
+  (3, 3, 'SEGU 2240718', 'KM Tanto Sejahtera', '2026-11-19', '2026-11-20', 'Diterima'),
+  (4, 7, 'BMOU 2871450', 'KM Kendhaga Nusantara', '2026-11-05', '2026-11-05', 'Diterima'),
+  (5, 7, 'CAIU 7340195', 'KM Kendhaga Nusantara', '2026-11-02', '2026-11-03', 'Diterima'),
+  (6, 7, 'TEMU 6038214', 'KM Tanto Sejahtera', '2026-11-13', '2026-11-14', 'Diterima'),
+  (7, 7, 'SEGU 5172093', 'KM Meratus Batam', '2026-11-10', '2026-11-10', 'Diterima');
+
+-- detail_po: PO 3 (Minang) = 9 TM, 10 SPK, 11 JA, 12 ISO; PO 7 (Tirta) = 25 TM, 26 SPK, 27 JA, 28 ISO
+INSERT INTO `detail_pengiriman` (`id_detail_pengiriman`, `id_pengiriman`, `id_detail_po`, `jumlah_dikirim`) VALUES
+  (1, 1, 9, 500), (2, 1, 10, 500), (3, 1, 11, 500), (4, 1, 12, 500),
+  (5, 2, 9, 500), (6, 2, 10, 500), (7, 2, 11, 500), (8, 2, 12, 500),
+  (9, 3, 9, 500), (10, 3, 10, 500), (11, 3, 11, 500), (12, 3, 12, 500),
+  (13, 4, 25, 500), (14, 4, 26, 500), (15, 4, 27, 500), (16, 4, 28, 500),
+  (17, 5, 25, 500), (18, 5, 26, 500), (19, 5, 27, 500), (20, 5, 28, 500),
+  (21, 6, 25, 500), (22, 6, 26, 500), (23, 6, 27, 500), (24, 6, 28, 500),
+  (25, 7, 25, 500), (26, 7, 26, 500), (27, 7, 27, 500), (28, 7, 28, 500);
+
+INSERT INTO `penerimaan_barang` (`id_penerimaan`, `id_pengiriman`, `tanggal_terima`) VALUES
+  (1, 1, '2026-11-16 09:00:00'),
+  (2, 2, '2026-11-09 10:30:00'),
+  (3, 3, '2026-11-20 08:45:00'),
+  (4, 4, '2026-11-05 13:15:00'),
+  (5, 5, '2026-11-03 09:30:00'),
+  (6, 6, '2026-11-14 14:00:00'),
+  (7, 7, '2026-11-10 11:00:00');
+
+-- jumlah_baik < jumlah_diterima = rusak; jumlah_diterima < jumlah_dikirim = kurang terhadap invoice
+INSERT INTO `detail_penerimaan` (`id_detail_penerimaan`, `id_penerimaan`, `id_detail_pengiriman`, `jumlah_diterima`, `jumlah_baik`, `kondisi`) VALUES
+  (1, 1, 1, 500, 460, 'Sebagian Rusak'), (2, 1, 2, 500, 500, 'Baik'), (3, 1, 3, 500, 476, 'Sebagian Rusak'), (4, 1, 4, 500, 500, 'Baik'),
+  (5, 2, 5, 500, 500, 'Baik'), (6, 2, 6, 475, 475, 'Baik'), (7, 2, 7, 500, 500, 'Baik'), (8, 2, 8, 485, 485, 'Baik'),
+  (9, 3, 9, 500, 488, 'Sebagian Rusak'), (10, 3, 10, 476, 476, 'Baik'), (11, 3, 11, 500, 500, 'Baik'), (12, 3, 12, 500, 500, 'Baik'),
+  (13, 4, 13, 500, 460, 'Sebagian Rusak'), (14, 4, 14, 500, 500, 'Baik'), (15, 4, 15, 500, 500, 'Baik'), (16, 4, 16, 500, 430, 'Sebagian Rusak'),
+  (17, 5, 17, 500, 445, 'Sebagian Rusak'), (18, 5, 18, 500, 500, 'Baik'), (19, 5, 19, 500, 482, 'Sebagian Rusak'), (20, 5, 20, 500, 500, 'Baik'),
+  (21, 6, 21, 500, 500, 'Baik'), (22, 6, 22, 500, 500, 'Baik'), (23, 6, 23, 500, 470, 'Sebagian Rusak'), (24, 6, 24, 478, 478, 'Baik'),
+  (25, 7, 25, 500, 500, 'Baik'), (26, 7, 26, 500, 464, 'Sebagian Rusak'), (27, 7, 27, 500, 500, 'Baik'), (28, 7, 28, 500, 500, 'Baik');
+
+INSERT INTO `klaim` (`id_klaim`, `id_penerimaan`, `tanggal_pengajuan`, `status`, `tanggal_penyelesaian`, `jadwal_kunjungan`, `catatan_pengembalian`, `bentuk_penyelesaian`, `catatan_penyelesaian`) VALUES
+  (1, 1, '2026-11-19 10:00:00', 'Menunggu Verifikasi SAM', NULL, '2026-11-25', NULL, NULL, NULL),
+  (2, 2, '2026-11-14 09:15:00', 'Diteruskan ke Logistik', NULL, '2026-11-17', NULL, NULL, NULL),
+  (3, 4, '2026-11-12 15:40:00', 'Menunggu Verifikasi SAM', NULL, '2026-11-24', NULL, NULL, NULL),
+  (4, 5, '2026-11-06 11:20:00', 'Selesai', '2026-11-20 16:00:00', '2026-11-10', NULL, 'Ganti Rugi', 'Ganti rugi diproses bersama tagihan Desember.'),
+  (5, 7, '2026-11-16 08:30:00', 'Dikembalikan', NULL, NULL, 'Foto bukti belum memperlihatkan kode produksi pada karton. Mohon unggah ulang foto yang jelas.', NULL, NULL);
+
+-- Penanggung jawab mengikuti aturan jenis kerusakan pada KlaimService::JENIS_KERUSAKAN
+INSERT INTO `detail_klaim` (`id_detail_klaim`, `id_klaim`, `id_detail_penerimaan`, `jenis_kerusakan`, `jumlah`, `penanggung_jawab`, `status_verifikasi`, `jumlah_terverifikasi`, `catatan_verifikasi`) VALUES
+  (1, 1, 1, 'Penyok', 40, 'Perusahaan', 'Menunggu Verifikasi', NULL, NULL),
+  (2, 1, 3, 'Bocor', 24, 'Perusahaan', 'Menunggu Verifikasi', NULL, NULL),
+  (3, 2, 6, 'Kurang Jumlah', 25, 'Perusahaan', 'Disetujui', 25, NULL),
+  (4, 2, 8, 'Kurang Jumlah', 15, 'Perusahaan', 'Disetujui', 15, 'Selisih cocok dengan surat jalan.'),
+  (5, 3, 16, 'Basah', 70, 'Perusahaan', 'Menunggu Verifikasi', NULL, NULL),
+  (6, 3, 13, 'Penyok', 40, 'Perusahaan', 'Menunggu Verifikasi', NULL, NULL),
+  (7, 4, 17, 'Penyok', 55, 'Perusahaan', 'Ditolak', 52, '3 karton hanya penyok ringan, masih layak jual.'),
+  (8, 4, 19, 'Bocor', 18, 'Perusahaan', 'Disetujui', 18, NULL),
+  (9, 5, 26, 'Bocor', 36, 'Perusahaan', 'Menunggu Verifikasi', NULL, NULL);
+
+-- id_pengesah 7 = Farhan Fitrahadi (SAM) dari data_dummy_epo.txt
+INSERT INTO `berita_acara_kerusakan` (`id_bak`, `id_klaim`, `nomor_bak`, `id_pengesah`, `tanggal_pengesahan`, `tanda_tangan_digital`, `status`) VALUES
+  (1, 2, 'BAK-00001', 7, '2026-11-17 15:00:00', 'klaim/tanda-tangan/contoh-bak-00001.png', 'Disahkan'),
+  (2, 4, 'BAK-00002', 7, '2026-11-10 14:30:00', 'klaim/tanda-tangan/contoh-bak-00002.png', 'Disahkan');
+
+-- Catatan: gambar tanda tangan contoh tidak ikut di file SQL. Tanpa gambar, dokumen BAK
+-- tetap tampil dengan keterangan "berkas tanda tangan tidak tersedia".

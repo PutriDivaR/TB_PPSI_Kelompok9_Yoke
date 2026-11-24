@@ -3,25 +3,21 @@
 namespace App\Http\Controllers\Klaim;
 
 use App\Http\Controllers\Controller;
-use Carbon\CarbonImmutable;
+use App\Models\DetailKlaim;
+use App\Models\Klaim;
+use App\Models\Pengguna;
+use App\Models\TahunFiskal;
+use App\Services\KlaimService;
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Validation\Rule;
 
 class LogistikKlaimController extends Controller implements HasMiddleware
 {
-    /**
-     * Bentuk penyelesaian klaim.
-     *
-     * Daftar ini masih sementara dan menunggu konfirmasi dari perusahaan.
-     *
-     * @var array<string, string>
-     */
-    private const BENTUK_PENYELESAIAN = [
-        'ganti_rugi' => 'Ganti Rugi',
-        'penyesuaian_kewajiban' => 'Penyesuaian Catatan Kewajiban',
-    ];
+    public function __construct(private KlaimService $klaimService) {}
 
     public static function middleware(): array
     {
@@ -34,77 +30,89 @@ class LogistikKlaimController extends Controller implements HasMiddleware
 
     public function proses(): View
     {
-        $hariIni = CarbonImmutable::now()->startOfDay();
-        // shortcut: tahun fiskal ditulis langsung, ganti dengan TahunFiskal aktif saat modul disambungkan ke database.
-        $tahunFiskal = ['label' => 'FY-2026', 'mulai' => CarbonImmutable::parse('2026-01-01'), 'selesai' => CarbonImmutable::parse('2026-12-31')];
-        $kotakMasuk = collect($this->contohKotakMasuk());
-        $selesai = collect($this->contohKlaimSelesai());
+        $hariIni = now()->startOfDay();
+        $tahunFiskal = TahunFiskal::query()->whereDate('tanggal_mulai', '<=', $hariIni)->whereDate('tanggal_selesai', '>=', $hariIni)->first();
+        $kotakMasuk = Klaim::query()->where('status', KlaimService::STATUS_DI_LOGISTIK)
+            ->with([
+                'penerimaan.pengiriman.po.forecast.distributor.wilayah',
+                'detailKlaimRecords.detailPenerimaan.detailPengiriman.detailPo.produk',
+                'beritaAcaraKerusakanRecord.pengesah',
+            ])
+            ->get()->sortBy(fn (Klaim $klaim) => $klaim->beritaAcaraKerusakanRecord?->tanggal_pengesahan)->values()
+            ->map(fn (Klaim $klaim) => $this->dokumen($klaim));
 
         return view('pages.klaim.logistik.proses', [
             'kotakMasuk' => $kotakMasuk,
-            'bentukPenyelesaian' => self::BENTUK_PENYELESAIAN,
+            'bentukPenyelesaian' => KlaimService::BENTUK_PENYELESAIAN,
             'tahunFiskal' => $tahunFiskal,
             'stats' => [
                 'belum_diproses' => $kotakMasuk->count(),
-                'selesai_bulan_ini' => $selesai->filter(fn (array $k) => $k['tanggal_selesai']->isSameMonth($hariIni))->count(),
-                // Klaim yang sampai di Logistik: berita acara di kotak masuk ditambah klaim yang sudah selesai.
-                'karton_tahun_fiskal' => $kotakMasuk->merge($selesai)
-                    ->filter(fn (array $k) => $k['tanggal_pengajuan']->between($tahunFiskal['mulai'], $tahunFiskal['selesai']))
-                    ->sum('total_karton'),
+                'selesai_bulan_ini' => Klaim::query()->where('status', KlaimService::STATUS_SELESAI)
+                    ->whereBetween('tanggal_penyelesaian', [$hariIni->copy()->startOfMonth(), $hariIni->copy()->endOfMonth()])->count(),
+                // Klaim yang sudah sampai di Logistik dihitung dengan jumlah hasil verifikasi SAM.
+                'karton_tahun_fiskal' => $tahunFiskal ? (int) DetailKlaim::query()
+                    ->whereHas('klaim', fn ($query) => $query->whereIn('status', [KlaimService::STATUS_DI_LOGISTIK, KlaimService::STATUS_SELESAI])
+                        ->whereBetween('tanggal_pengajuan', [$tahunFiskal->tanggal_mulai->copy()->startOfDay(), $tahunFiskal->tanggal_selesai->copy()->endOfDay()]))
+                    ->sum('jumlah_terverifikasi') : 0,
             ],
         ]);
     }
 
-    /**
-     * Berita acara yang sudah disahkan SAM dan menunggu diproses Logistik (data contoh).
-     *
-     * @return list<array{kode_bak: string, kode_klaim: string, distributor: string, kota: string, nomor_kontainer: string, nomor_po: string, tanggal_tiba: CarbonImmutable, tanggal_pengajuan: CarbonImmutable, tanggal_disahkan: CarbonImmutable, pengesah: string, baris: list<array{produk: string, jenis: string, diajukan: int, terverifikasi: int, penanggung: string}>, total_karton: int}>
-     */
-    private function contohKotakMasuk(): array
+    public function selesaikan(Request $request, Klaim $klaim): RedirectResponse
     {
-        $rusak = fn (string $produk, string $jenis, int $diajukan, int $terverifikasi) => [
-            'produk' => $produk, 'jenis' => $jenis, 'diajukan' => $diajukan, 'terverifikasi' => $terverifikasi,
-            'penanggung' => DistributorKlaimController::JENIS_KERUSAKAN[$jenis]['penanggung'],
-        ];
-        $dokumen = [
-            [9, 17, 'PT Minang Niaga Jaya', 'Padang', 'TCNU 7702154', 'PO-YFI-2026-0081', '2026-11-09', '2026-11-14', '2026-11-17', [
-                $rusak('FAN Sparkling Water 325ml', 'Kurang Jumlah', 25, 25),
-                $rusak('YFI Isotonik Refresh 330ml', 'Kurang Jumlah', 15, 15),
-            ]],
-            [8, 13, 'PT Tirta Niaga Mandiri', 'Pekanbaru', 'CAIU 7340195', 'PO-YFI-2026-0084', '2026-11-03', '2026-11-09', '2026-11-15', [
-                $rusak('YFI Teh Melati 500ml', 'Penyok', 55, 52),
-                $rusak('YFI Jus Apel 330ml', 'Bocor', 18, 18),
-            ]],
-            [6, 10, 'PT Tirta Niaga Mandiri', 'Pekanbaru', 'OOLU 2958841', 'PO-YFI-2026-0077', '2026-10-24', '2026-10-31', '2026-11-10', [
-                $rusak('YFI Isotonik Refresh 330ml', 'Basah', 32, 32),
-            ]],
-        ];
+        $nilai = $request->validate([
+            'bentuk_penyelesaian' => ['required', Rule::in(KlaimService::BENTUK_PENYELESAIAN)],
+            'catatan' => ['nullable', 'string', 'max:1000'],
+        ], ['bentuk_penyelesaian.required' => 'Pilih bentuk penyelesaian klaim.']);
+        $this->klaimService->selesaikan($klaim, $nilai['bentuk_penyelesaian'], $nilai['catatan'] ?? null, $this->logistikAktif());
 
-        return array_map(fn (array $d) => [
-            'kode_bak' => 'BAK-'.str_pad((string) $d[0], 5, '0', STR_PAD_LEFT),
-            'kode_klaim' => 'KLM-'.str_pad((string) $d[1], 5, '0', STR_PAD_LEFT),
-            'distributor' => $d[2], 'kota' => $d[3], 'nomor_kontainer' => $d[4], 'nomor_po' => $d[5],
-            'tanggal_tiba' => CarbonImmutable::parse($d[6]), 'tanggal_pengajuan' => CarbonImmutable::parse($d[7]),
-            'tanggal_disahkan' => CarbonImmutable::parse($d[8]), 'pengesah' => 'Farhan Fitrahadi',
-            'baris' => $d[9], 'total_karton' => array_sum(array_column($d[9], 'terverifikasi')),
-        ], $dokumen);
+        return redirect()->route('klaim.logistik.proses')->with('success', KlaimService::kodeKlaim($klaim).' ditandai selesai.');
     }
 
-    /**
-     * Klaim yang sudah diselesaikan Logistik (data contoh, untuk kartu ringkasan).
-     *
-     * @return list<array{kode_klaim: string, tanggal_pengajuan: CarbonImmutable, tanggal_selesai: CarbonImmutable, total_karton: int}>
-     */
-    private function contohKlaimSelesai(): array
+    public function kembalikan(Request $request, Klaim $klaim): RedirectResponse
     {
-        return array_map(fn (array $k) => [
-            'kode_klaim' => 'KLM-'.str_pad((string) $k[0], 5, '0', STR_PAD_LEFT),
-            'tanggal_pengajuan' => CarbonImmutable::parse($k[1]), 'tanggal_selesai' => CarbonImmutable::parse($k[2]), 'total_karton' => $k[3],
-        ], [
-            [15, '2026-11-03', '2026-11-12', 126],
-            [12, '2026-10-13', '2026-10-24', 88],
-            [11, '2026-09-28', '2026-10-09', 30],
-            [9, '2026-10-22', '2026-11-05', 60],
-        ]);
+        $nilai = $request->validate(['catatan' => ['required', 'string', 'max:1000']],
+            ['catatan.required' => 'Tuliskan alasan pengembalian ke SAM pada kolom catatan.']);
+        $this->klaimService->kembalikanKeSam($klaim, $nilai['catatan'], $this->logistikAktif());
+
+        return redirect()->route('klaim.logistik.proses')->with('success', KlaimService::kodeKlaim($klaim).' dikembalikan ke SAM untuk diverifikasi ulang.');
+    }
+
+    /** @return array<string, mixed> */
+    private function dokumen(Klaim $klaim): array
+    {
+        $distributor = $klaim->penerimaan->pengiriman->po->forecast->distributor;
+        $bak = $klaim->beritaAcaraKerusakanRecord;
+
+        return [
+            'id' => $klaim->id_klaim,
+            'kode_bak' => $bak?->nomor_bak ?? '-',
+            'kode_klaim' => KlaimService::kodeKlaim($klaim),
+            'distributor' => $distributor->nama,
+            'kota' => $distributor->wilayah?->nama_wilayah,
+            'nomor_kontainer' => $klaim->penerimaan->pengiriman->nomor_kontainer,
+            'nomor_po' => $klaim->penerimaan->pengiriman->po->nomor_po,
+            'tanggal_tiba' => $klaim->penerimaan->tanggal_terima,
+            'tanggal_disahkan' => $bak?->tanggal_pengesahan,
+            'pengesah' => $bak?->pengesah?->nama ?? '-',
+            'url_bak' => $bak ? route('klaim.bak', $klaim) : null,
+            'baris' => $klaim->detailKlaimRecords->map(fn (DetailKlaim $detail) => [
+                'produk' => $detail->detailPenerimaan->detailPengiriman->detailPo->produk->nama_produk,
+                'jenis' => $detail->jenis_kerusakan,
+                'diajukan' => $detail->jumlah,
+                'terverifikasi' => (int) $detail->jumlah_terverifikasi,
+                'penanggung' => $detail->penanggung_jawab,
+            ])->all(),
+            'total_karton' => (int) $klaim->detailKlaimRecords->sum('jumlah_terverifikasi'),
+        ];
+    }
+
+    private function logistikAktif(): Pengguna
+    {
+        $pengguna = Pengguna::query()->where('status_aktif', true)
+            ->whereHas('peran', fn ($query) => $query->where('nama_peran', 'Logistik Pusat'))->orderBy('id_pengguna')->first();
+        abort_unless($pengguna, 422, 'Belum ada pengguna aktif berperan Logistik Pusat.');
+
+        return $pengguna;
     }
 }
