@@ -90,8 +90,12 @@ Route::middleware('web')->prefix('v1')->name('api.v1.')->group(function (): void
             Route::post('/', [ClaimController::class, 'store'])->middleware('role:distributor')->name('store');
             Route::get('/{claim}', [ClaimController::class, 'show'])
                 ->middleware('role:admin,distributor,logistik pusat,sam')->whereNumber('claim')->name('show');
+            Route::post('/{claim}/visit', [ClaimController::class, 'scheduleVisit'])
+                ->middleware('role:sam')->whereNumber('claim')->name('visit');
             Route::post('/{claim}/verification', [ClaimController::class, 'verify'])
                 ->middleware('role:sam')->whereNumber('claim')->name('verify');
+            Route::post('/{claim}/return', [ClaimController::class, 'returnToDistributor'])
+                ->middleware('role:sam')->whereNumber('claim')->name('return');
             Route::post('/{claim}/resolution', [ClaimController::class, 'resolve'])
                 ->middleware('role:logistik pusat')->whereNumber('claim')->name('resolve');
             Route::get('/{claim}/photos/{photo}', [ClaimController::class, 'photo'])

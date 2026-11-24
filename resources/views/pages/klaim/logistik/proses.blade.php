@@ -27,7 +27,7 @@
             <p class="text-[10px] text-slate-500">Diselesaikan pada {{ $tanggalEpo(now(), 'F Y') }}</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <div class="flex justify-between"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Karton Diklaim {{ $tahunFiskal['label'] }}</p><i class="fa-solid fa-boxes-stacked text-blue-500"></i></div>
+            <div class="flex justify-between"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Karton Diklaim {{ $tahunFiskal ? 'FY-'.$tahunFiskal->tanggal_mulai->year : '' }}</p><i class="fa-solid fa-boxes-stacked text-blue-500"></i></div>
             <p class="mt-2 text-3xl font-extrabold text-slate-900">{{ number_format($stats['karton_tahun_fiskal'], 0, ',', '.') }} <span class="text-xs text-slate-500">Karton</span></p>
             <p class="text-[10px] text-slate-500">Akumulasi tahun fiskal berjalan</p>
         </div>
@@ -121,39 +121,40 @@
                                 <p class="text-sm text-slate-700">Disahkan {{ $tanggalEpo($dok['tanggal_disahkan'], 'd M Y') }} oleh <span class="font-semibold text-slate-900">{{ $dok['pengesah'] }}</span></p>
                             </div>
                         </div>
-                        <div class="flex gap-2">
-                            {{-- Dokumen BAK belum dibuat; kedua tombol sementara href="#". --}}
-                            <a href="#" class="text-[11px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i>Pratinjau</a>
-                            <a href="#" class="text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded"><i class="fa-solid fa-download mr-1"></i>Unduh</a>
-                        </div>
+                        @if ($dok['url_bak'])
+                            <div class="flex gap-2">
+                                <a href="{{ $dok['url_bak'] }}" target="_blank" class="text-[11px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i>Pratinjau</a>
+                                <a href="{{ $dok['url_bak'] }}?cetak=1" target="_blank" class="text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded"><i class="fa-solid fa-download mr-1"></i>Unduh</a>
+                            </div>
+                        @endif
                     </div>
 
-                    {{-- Tindakan penyelesaian --}}
-                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4" x-data="{ bentuk: '', catatan: '' }">
+                    {{-- Tindakan penyelesaian: satu form, tombol Kembalikan memakai formaction ke route lain. --}}
+                    <form method="POST" action="{{ route('klaim.logistik.selesaikan', $dok['id']) }}" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4" x-data="{ bentuk: '', catatan: '' }">
+                        @csrf
                         <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tindakan Penyelesaian</p>
                         <div class="grid sm:grid-cols-2 gap-3">
-                            @foreach ($bentukPenyelesaian as $nilai => $label)
+                            @foreach ($bentukPenyelesaian as $bentuk)
                                 <label class="flex items-center gap-3 px-4 py-3 rounded-lg border-2 cursor-pointer text-sm font-semibold transition"
-                                       :class="bentuk === @js($nilai) ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'">
-                                    <input type="radio" name="bentuk_{{ $i }}" value="{{ $nilai }}" x-model="bentuk" class="accent-red-600">
-                                    {{ $label }}
+                                       :class="bentuk === @js($bentuk) ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'">
+                                    <input type="radio" name="bentuk_penyelesaian" value="{{ $bentuk }}" x-model="bentuk" class="accent-red-600">
+                                    {{ $bentuk }}
                                 </label>
                             @endforeach
                         </div>
                         <label class="block">
                             <span class="text-sm font-semibold text-slate-700">Catatan</span>
-                            <textarea x-model="catatan" rows="3" placeholder="Catatan penyelesaian atau alasan pengembalian ke SAM" class="mt-1 w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"></textarea>
+                            <textarea name="catatan" maxlength="1000" x-model="catatan" rows="3" placeholder="Catatan penyelesaian atau alasan pengembalian ke SAM" class="mt-1 w-full px-3 py-2 text-sm border border-slate-200 rounded-lg"></textarea>
                         </label>
-                        {{-- Penyimpanan belum dibuat; Selesai butuh bentuk penyelesaian, Kembalikan butuh catatan. --}}
                         <div class="flex flex-wrap justify-end gap-3">
-                            <button type="button" :disabled="!catatan.trim()" class="px-5 py-2.5 rounded-lg border-2 border-red-600 bg-white text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button type="submit" formaction="{{ route('klaim.logistik.kembalikan', $dok['id']) }}" :disabled="!catatan.trim()" class="px-5 py-2.5 rounded-lg border-2 border-red-600 bg-white text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <i class="fa-solid fa-rotate-left mr-1"></i>Kembalikan ke SAM
                             </button>
-                            <button type="button" :disabled="!bentuk" class="px-5 py-2.5 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <button type="submit" :disabled="!bentuk" class="px-5 py-2.5 rounded-lg bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <i class="fa-solid fa-circle-check mr-1"></i>Tandai Klaim Selesai
                             </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
             @empty
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-12 text-center">

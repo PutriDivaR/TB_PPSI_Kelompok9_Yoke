@@ -3,56 +3,33 @@
 namespace App\Http\Controllers\Klaim;
 
 use App\Http\Controllers\Controller;
-use Carbon\CarbonImmutable;
+use App\Models\DetailKlaim;
+use App\Models\DetailPenerimaan;
+use App\Models\Distributor;
+use App\Models\Klaim;
+use App\Models\PenerimaanBarang;
+use App\Models\TahunFiskal;
+use App\Services\KlaimService;
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Validation\Rule;
 
 class DistributorKlaimController extends Controller implements HasMiddleware
 {
-    /** Distributor menyortir barang sekitar satu minggu setelah barang tiba di gudang. */
-    private const HARI_PENYORTIRAN = 7;
-
     /**
-     * Jenis klaim beserta pihak yang menanggung (aturan pasti dari wawancara SAM).
-     *
-     * @var array<string, string>
-     */
-    private const PENANGGUNG_KLAIM = [
-        'Kerusakan Barang Dalam Perjalanan' => 'Perusahaan',
-        'Barang Kurang dari Invoice' => 'Perusahaan',
-        'Kerusakan Penyimpanan Gudang' => 'Distributor',
-        'Retur Kedaluwarsa dari Toko' => 'Distributor',
-    ];
-
-    /**
-     * Jenis kerusakan beserta penanggung dan alasannya.
-     *
-     * Daftar jenis ini masih sementara dan menunggu konfirmasi dari perusahaan.
-     * shortcut: Penyok/Bocor/Basah dianggap kerusakan Barang Dalam Perjalanan karena jenisnya saja
-     * tidak membedakan kerusakan penyimpanan gudang; perlu penyebab kerusakan jika aturan ini dipastikan.
-     *
-     * @var array<string, array{penanggung: string, alasan: string}>
-     */
-    public const JENIS_KERUSAKAN = [
-        'Penyok' => ['penanggung' => 'Perusahaan', 'alasan' => 'Kerusakan fisik yang ditemukan saat penyortiran kedatangan dianggap terjadi selama Barang Dalam Perjalanan, dan dipastikan SAM saat pemeriksaan fisik.'],
-        'Bocor' => ['penanggung' => 'Perusahaan', 'alasan' => 'Kerusakan fisik yang ditemukan saat penyortiran kedatangan dianggap terjadi selama Barang Dalam Perjalanan, dan dipastikan SAM saat pemeriksaan fisik.'],
-        'Basah' => ['penanggung' => 'Perusahaan', 'alasan' => 'Kerusakan fisik yang ditemukan saat penyortiran kedatangan dianggap terjadi selama Barang Dalam Perjalanan, dan dipastikan SAM saat pemeriksaan fisik.'],
-        'Kurang Jumlah' => ['penanggung' => 'Perusahaan', 'alasan' => 'Barang yang kurang terhadap invoice menjadi tanggungan perusahaan.'],
-        'Kedaluwarsa' => ['penanggung' => 'Distributor', 'alasan' => 'Retur kedaluwarsa menjadi tanggungan distributor.'],
-    ];
-
-    /**
-     * Status klaim belum baku; label dan warna lencana masih sementara.
+     * Label dan warna lencana per status klaim.
      *
      * @var array<string, array{0: string, 1: string}>
      */
     private const LENCANA_STATUS = [
-        'Menunggu Verifikasi SAM' => ['Menunggu verifikasi SAM', 'bg-amber-50 text-amber-700'],
-        'Diteruskan ke Logistik' => ['Diproses Logistik', 'bg-blue-50 text-blue-700'],
-        'Selesai' => ['Selesai', 'bg-emerald-50 text-emerald-700'],
-        'Dikembalikan' => ['Dikembalikan', 'bg-red-50 text-red-700'],
+        KlaimService::STATUS_MENUNGGU_SAM => ['Menunggu verifikasi SAM', 'bg-amber-50 text-amber-700'],
+        KlaimService::STATUS_DI_LOGISTIK => ['Diproses Logistik', 'bg-blue-50 text-blue-700'],
+        KlaimService::STATUS_SELESAI => ['Selesai', 'bg-emerald-50 text-emerald-700'],
+        KlaimService::STATUS_DIKEMBALIKAN => ['Dikembalikan', 'bg-red-50 text-red-700'],
     ];
 
     /** @var list<string> */
@@ -64,13 +41,14 @@ class DistributorKlaimController extends Controller implements HasMiddleware
         'Penyelesaian oleh Logistik Pusat',
     ];
 
-    /** @var array<string, string> */
-    private const PRODUK = [
-        'YFI-TM-500' => 'YFI Teh Melati 500ml',
-        'FAN-SPK-325' => 'FAN Sparkling Water 325ml',
-        'YFI-JA-330' => 'YFI Jus Apel 330ml',
-        'YFI-ISO-330' => 'YFI Isotonik Refresh 330ml',
+    private const RELASI_KLAIM = [
+        'penerimaan.pengiriman.po',
+        'detailKlaimRecords.detailPenerimaan.detailPengiriman.detailPo.produk',
+        'detailKlaimRecords.fotoBuktiRecords',
+        'beritaAcaraKerusakanRecord.pengesah',
     ];
+
+    public function __construct(private KlaimService $klaimService) {}
 
     public static function middleware(): array
     {
@@ -81,132 +59,202 @@ class DistributorKlaimController extends Controller implements HasMiddleware
         }];
     }
 
-    public function beranda(): View
+    public function beranda(Request $request): View
     {
-        $hariIni = CarbonImmutable::now()->startOfDay();
-        // shortcut: tahun fiskal ditulis langsung, ganti dengan TahunFiskal aktif saat modul disambungkan ke database.
-        $tahunFiskal = ['label' => 'FY-2026', 'mulai' => CarbonImmutable::parse('2026-01-01'), 'selesai' => CarbonImmutable::parse('2026-12-31')];
-        $riwayat = collect($this->contohKlaim());
-
-        $kedatanganTerakhir = ['nomor_kontainer' => 'SEGU 2240718', 'tanggal_tiba' => CarbonImmutable::parse('2026-11-18')];
-        $batasPenyortiran = $kedatanganTerakhir['tanggal_tiba']->addDays(self::HARI_PENYORTIRAN);
+        $distributor = $this->distributorAktif($request);
+        if (! $distributor) {
+            return view('pages.klaim.distributor.beranda', ['distributor' => null]);
+        }
+        $hariIni = now()->startOfDay();
+        $riwayat = Klaim::query()->milikDistributor($distributor->id_distributor)->with(self::RELASI_KLAIM)
+            ->orderByDesc('tanggal_pengajuan')->get()->map(fn (Klaim $klaim) => $this->ringkasKlaim($klaim));
+        $tahunFiskal = TahunFiskal::query()->whereDate('tanggal_mulai', '<=', $hariIni)->whereDate('tanggal_selesai', '>=', $hariIni)->first();
+        $kedatanganTerakhir = $this->penerimaanDistributor($distributor)->doesntHave('klaimRecordAsPenerimaan')
+            ->with('pengiriman')->orderByDesc('tanggal_terima')->first();
+        $batasPenyortiran = $kedatanganTerakhir?->tanggal_terima->copy()->startOfDay()->addDays(KlaimService::HARI_PENYORTIRAN);
 
         return view('pages.klaim.distributor.beranda', [
-            'distributor' => ['nama' => 'PT Minang Niaga Jaya', 'wilayah' => 'Padang, Sumatera Barat'],
+            'distributor' => $distributor,
             'riwayat' => $riwayat,
             'kedatanganTerakhir' => $kedatanganTerakhir,
             'batasPenyortiran' => $batasPenyortiran,
             'tahunFiskal' => $tahunFiskal,
             'stats' => [
-                'menunggu_verifikasi' => $riwayat->where('status', 'Menunggu Verifikasi SAM')->count(),
-                'sisa_hari_sortir' => (int) $hariIni->diffInDays($batasPenyortiran, false),
-                'selesai_bulan_ini' => $riwayat->where('status', 'Selesai')
+                'menunggu_verifikasi' => $riwayat->where('status', KlaimService::STATUS_MENUNGGU_SAM)->count(),
+                'sisa_hari_sortir' => $batasPenyortiran ? (int) $hariIni->diffInDays($batasPenyortiran, false) : null,
+                'selesai_bulan_ini' => $riwayat->where('status', KlaimService::STATUS_SELESAI)
                     ->filter(fn (array $klaim) => $klaim['tanggal_selesai']?->isSameMonth($hariIni))->count(),
-                'karton_tahun_fiskal' => $riwayat
-                    ->filter(fn (array $klaim) => $klaim['tanggal_pengajuan']->between($tahunFiskal['mulai'], $tahunFiskal['selesai']))
-                    ->sum('jumlah_karton'),
+                'karton_tahun_fiskal' => $tahunFiskal ? $riwayat
+                    ->filter(fn (array $klaim) => $klaim['tanggal_pengajuan']->between($tahunFiskal->tanggal_mulai, $tahunFiskal->tanggal_selesai->copy()->endOfDay()))
+                    ->sum('jumlah_karton') : 0,
             ],
         ]);
     }
 
-    public function ajukan(): View
+    public function ajukan(Request $request): View|RedirectResponse
     {
-        // Sementara: kedatangan yang sudah punya klaim tetap bisa dipilih, karena aturan satu klaim per kedatangan belum pasti.
-        $kedatangan = collect([
-            [31, 'PO-YFI-2026-0089', 'SEGU 2240718', '2026-11-18', 2000, 1976],
-            [30, 'PO-YFI-2026-0089', 'MRKU 4821937', '2026-11-16', 2000, 2000],
-            [28, 'PO-YFI-2026-0081', 'TCNU 7702154', '2026-11-09', 2000, 1960],
-            [27, 'PO-YFI-2026-0081', 'MSKU 5530192', '2026-11-07', 2000, 2000],
-        ])->map(fn (array $k) => [
-            'id' => $k[0], 'nomor_po' => $k[1], 'nomor_kontainer' => $k[2],
-            'tanggal_tiba' => CarbonImmutable::parse($k[3])->locale('id')->translatedFormat('d M Y'),
-            'jumlah_invoice' => $k[4], 'jumlah_diterima' => $k[5], 'selisih' => $k[5] - $k[4],
-        ]);
+        $distributor = $this->distributorAktif($request);
+        if (! $distributor) {
+            return redirect()->route('klaim.distributor.beranda');
+        }
+        // Kedatangan yang bisa diklaim: belum punya klaim, atau klaimnya dikembalikan untuk diperbaiki.
+        $kedatangan = $this->penerimaanDistributor($distributor)
+            ->where(fn ($query) => $query->doesntHave('klaimRecordAsPenerimaan')
+                ->orWhereHas('klaimRecordAsPenerimaan', fn ($klaim) => $klaim->where('status', KlaimService::STATUS_DIKEMBALIKAN)))
+            ->with(['pengiriman.po', 'detailPenerimaanRecordsAsPenerimaan.detailPengiriman.detailPo.produk', 'klaimRecordAsPenerimaan.detailKlaimRecords'])
+            ->orderByDesc('tanggal_terima')->get()
+            ->map(fn (PenerimaanBarang $penerimaan) => $this->ringkasKedatangan($penerimaan));
 
         return view('pages.klaim.distributor.ajukan', [
-            'distributor' => ['nama' => 'PT Minang Niaga Jaya', 'wilayah' => 'Padang, Sumatera Barat'],
+            'distributor' => $distributor,
             'kedatangan' => $kedatangan,
-            'produk' => collect(self::PRODUK)->map(fn (string $nama, string $kode) => ['kode' => $kode, 'nama' => $nama])->values(),
-            'jenisKerusakan' => self::JENIS_KERUSAKAN,
+            'pilihAwal' => (string) $request->integer('penerimaan') ?: '',
+            'jenisKerusakan' => KlaimService::JENIS_KERUSAKAN,
         ]);
     }
 
-    public function detail(int $klaim): View
+    public function simpan(Request $request): RedirectResponse
     {
-        $data = collect($this->contohKlaim())->firstWhere('id', $klaim);
-        $rincian = $this->contohDetail()[$klaim] ?? null;
-        abort_unless($data && $rincian, 404);
+        $distributor = $this->distributorAktif($request);
+        abort_unless($distributor, 422, 'Belum ada distributor aktif.');
+        $nilai = $request->validate([
+            'id_penerimaan' => ['required', 'integer', 'exists:penerimaan_barang,id_penerimaan'],
+            'baris' => ['required', 'array', 'min:1'],
+            'baris.*.id_detail_penerimaan' => ['required', 'integer'],
+            'baris.*.jenis_kerusakan' => ['required', Rule::in(array_keys(KlaimService::JENIS_KERUSAKAN))],
+            'baris.*.jumlah' => ['required', 'integer', 'min:1', 'max:100000'],
+            'baris.*.foto' => ['sometimes', 'array', 'max:8'],
+            'baris.*.foto.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ], [
+            'baris.required' => 'Tambahkan minimal satu baris kerusakan.',
+            'baris.*.id_detail_penerimaan.required' => 'Pilih produk pada setiap baris kerusakan.',
+            'baris.*.jenis_kerusakan.required' => 'Pilih jenis kerusakan pada setiap baris.',
+            'baris.*.foto.*.image' => 'Foto bukti harus berupa gambar.',
+            'baris.*.foto.*.max' => 'Ukuran foto bukti maksimal 5 MB.',
+        ]);
+        $baris = collect($nilai['baris'])->map(fn (array $item, int|string $kunci) => [
+            'id_detail_penerimaan' => (int) $item['id_detail_penerimaan'],
+            'jenis_kerusakan' => $item['jenis_kerusakan'],
+            'jumlah' => (int) $item['jumlah'],
+            'foto' => $request->file("baris.{$kunci}.foto", []),
+        ])->values()->all();
+        $klaim = $this->klaimService->ajukan((int) $nilai['id_penerimaan'], $distributor->id_distributor, $baris, $distributor->penggunaRecord);
 
-        $jumlahTahapLewat = count($rincian['tanggal_tahap']);
+        return redirect()->route('klaim.distributor.detail', $klaim)
+            ->with('success', 'Klaim '.KlaimService::kodeKlaim($klaim).' terkirim dan menunggu verifikasi Sales Area Manager.');
+    }
+
+    public function detail(Request $request, Klaim $klaim): View
+    {
+        $distributor = $this->distributorAktif($request);
+        abort_unless($distributor && Klaim::query()->whereKey($klaim->id_klaim)->milikDistributor($distributor->id_distributor)->exists(), 404);
+        $klaim->load(self::RELASI_KLAIM);
+        $bak = $klaim->beritaAcaraKerusakanRecord;
+        $bakSah = $bak?->status === KlaimService::BAK_DISAHKAN;
+        [$jumlahLewat, $keteranganBerjalan] = match ($klaim->status) {
+            KlaimService::STATUS_SELESAI => [5, null],
+            KlaimService::STATUS_DI_LOGISTIK => [4, 'Sedang berjalan'],
+            KlaimService::STATUS_DIKEMBALIKAN => [0, 'Dikembalikan untuk diperbaiki'],
+            default => [2, 'Sedang berjalan'],
+        };
+        $tanggalTahap = [$klaim->tanggal_pengajuan, $klaim->tanggal_pengajuan, $bak?->tanggal_pengesahan, $bak?->tanggal_pengesahan, $klaim->tanggal_penyelesaian];
         $tahap = collect(self::TAHAP_KLAIM)->map(fn (string $nama, int $i) => [
             'nama' => $nama,
-            'status' => $i < $jumlahTahapLewat ? 'lewat' : ($i === $jumlahTahapLewat ? 'berjalan' : 'belum'),
-            'tanggal' => isset($rincian['tanggal_tahap'][$i]) ? CarbonImmutable::parse($rincian['tanggal_tahap'][$i]) : null,
+            'status' => $i < $jumlahLewat ? 'lewat' : ($i === $jumlahLewat ? 'berjalan' : 'belum'),
+            'tanggal' => $i < $jumlahLewat ? $tanggalTahap[$i] : null,
+            'keterangan' => $keteranganBerjalan,
         ]);
 
         return view('pages.klaim.distributor.detail', [
-            'klaim' => $data + $rincian,
+            'klaim' => $this->ringkasKlaim($klaim) + [
+                'nomor_po' => $klaim->penerimaan->pengiriman->po->nomor_po,
+                'catatan_pengembalian' => $klaim->catatan_pengembalian,
+                'bentuk_penyelesaian' => $klaim->bentuk_penyelesaian,
+                'catatan_penyelesaian' => $klaim->catatan_penyelesaian,
+                'id_penerimaan' => $klaim->id_penerimaan,
+                'baris' => $klaim->detailKlaimRecords->map(fn (DetailKlaim $detail) => [
+                    'kode' => $detail->detailPenerimaan->detailPengiriman->detailPo->produk->kode_sku,
+                    'nama' => $detail->detailPenerimaan->detailPengiriman->detailPo->produk->nama_produk,
+                    'jenis' => $detail->jenis_kerusakan,
+                    'karton' => $detail->jumlah,
+                    'terverifikasi' => $detail->jumlah_terverifikasi,
+                    'catatan_verifikasi' => $detail->catatan_verifikasi,
+                    'foto' => $detail->fotoBuktiRecords->map(fn ($foto) => ['url' => route('klaim.foto', $foto), 'sumber' => $foto->sumber ?? 'Distributor'])->all(),
+                ])->all(),
+                'bak' => $bakSah ? [
+                    'kode' => $bak->nomor_bak,
+                    'tanggal' => $bak->tanggal_pengesahan,
+                    'pengesah' => $bak->pengesah->nama,
+                    'url' => route('klaim.bak', $klaim),
+                ] : null,
+            ],
             'tahap' => $tahap,
         ]);
     }
 
-    /**
-     * Data contoh sementara sampai tabel klaim disambungkan.
-     *
-     * @return list<array{id: int, kode: string, nomor_kontainer: string, tanggal_tiba: CarbonImmutable, tanggal_pengajuan: CarbonImmutable, jenis: string, penanggung: string, jumlah_karton: int, status: string, lencana: array{0: string, 1: string}, tanggal_selesai: ?CarbonImmutable, punya_detail: bool}>
-     */
-    private function contohKlaim(): array
+    /** @return array<string, mixed> */
+    private function ringkasKlaim(Klaim $klaim): array
     {
-        $baris = [
-            [18, 'MRKU 4821937', '2026-11-16', '2026-11-19', 'Kerusakan Barang Dalam Perjalanan', 64, 'Menunggu Verifikasi SAM', null],
-            [17, 'TCNU 7702154', '2026-11-09', '2026-11-14', 'Barang Kurang dari Invoice', 40, 'Diteruskan ke Logistik', null],
-            [15, 'MSKU 3359820', '2026-10-28', '2026-11-03', 'Kerusakan Barang Dalam Perjalanan', 126, 'Selesai', '2026-11-12'],
-            [14, 'TGHU 6614028', '2026-10-20', '2026-10-27', 'Kerusakan Penyimpanan Gudang', 22, 'Dikembalikan', null],
-            [12, 'CAIU 5087316', '2026-10-06', '2026-10-13', 'Kerusakan Barang Dalam Perjalanan', 88, 'Selesai', '2026-10-24'],
-            [11, 'MRKU 1938405', '2026-09-22', '2026-09-28', 'Barang Kurang dari Invoice', 30, 'Selesai', '2026-10-09'],
-        ];
-
-        return array_map(fn (array $b) => [
-            'id' => $b[0], 'kode' => 'KLM-'.str_pad((string) $b[0], 5, '0', STR_PAD_LEFT), 'nomor_kontainer' => $b[1],
-            'tanggal_tiba' => CarbonImmutable::parse($b[2]), 'tanggal_pengajuan' => CarbonImmutable::parse($b[3]),
-            'jenis' => $b[4], 'penanggung' => self::PENANGGUNG_KLAIM[$b[4]], 'jumlah_karton' => $b[5],
-            'status' => $b[6], 'lencana' => self::LENCANA_STATUS[$b[6]] ?? [$b[6], 'bg-slate-100 text-slate-700'],
-            'tanggal_selesai' => $b[7] ? CarbonImmutable::parse($b[7]) : null,
-            'punya_detail' => isset($this->contohDetail()[$b[0]]),
-        ], $baris);
-    }
-
-    /**
-     * Rincian contoh untuk dua klaim dengan posisi tahap berbeda.
-     *
-     * tanggal_tahap berisi tanggal tiap tahap yang sudah lewat; tahap berikutnya dianggap sedang berjalan.
-     *
-     * @return array<int, array{nomor_po: string, tanggal_tahap: list<string>, baris: list<array{kode: string, nama: string, jenis: string, karton: int, foto: list<string>}>, bak: ?array{kode: string, tanggal: CarbonImmutable, pengesah: string, jabatan: string}}>
-     */
-    private function contohDetail(): array
-    {
-        $baris = fn (string $kode, string $jenis, int $karton, array $foto) => ['kode' => $kode, 'nama' => self::PRODUK[$kode], 'jenis' => $jenis, 'karton' => $karton, 'foto' => $foto];
+        $details = $klaim->detailKlaimRecords;
 
         return [
-            18 => [
-                'nomor_po' => 'PO-YFI-2026-0089',
-                'tanggal_tahap' => ['2026-11-19', '2026-11-19'],
-                'baris' => [
-                    $baris('YFI-TM-500', 'Penyok', 40, ['KLM18-penyok-01.jpg', 'KLM18-penyok-02.jpg']),
-                    $baris('YFI-JA-330', 'Bocor', 24, ['KLM18-bocor-01.jpg']),
-                ],
-                'bak' => null,
-            ],
-            17 => [
-                'nomor_po' => 'PO-YFI-2026-0081',
-                'tanggal_tahap' => ['2026-11-14', '2026-11-14', '2026-11-17', '2026-11-17'],
-                'baris' => [
-                    $baris('FAN-SPK-325', 'Kurang Jumlah', 25, ['KLM17-palet-01.jpg', 'KLM17-surat-jalan.jpg']),
-                    $baris('YFI-ISO-330', 'Kurang Jumlah', 15, ['KLM17-palet-02.jpg']),
-                ],
-                'bak' => ['kode' => 'BAK-'.str_pad((string) 9, 5, '0', STR_PAD_LEFT), 'tanggal' => CarbonImmutable::parse('2026-11-17'),
-                    'pengesah' => 'Farhan Fitrahadi', 'jabatan' => 'Sales Area Manager Sumbar & Riau'],
-            ],
+            'id' => $klaim->id_klaim,
+            'kode' => KlaimService::kodeKlaim($klaim),
+            'nomor_kontainer' => $klaim->penerimaan->pengiriman->nomor_kontainer,
+            'tanggal_tiba' => $klaim->penerimaan->tanggal_terima,
+            'tanggal_pengajuan' => $klaim->tanggal_pengajuan,
+            'tanggal_selesai' => $klaim->tanggal_penyelesaian,
+            'jumlah_karton' => (int) $details->sum('jumlah'),
+            'jenis' => $details->pluck('jenis_kerusakan')->unique()->implode(', '),
+            'penanggung' => $details->pluck('penanggung_jawab')->unique()->implode(' & '),
+            'status' => $klaim->status,
+            'lencana' => self::LENCANA_STATUS[$klaim->status] ?? [$klaim->status, 'bg-slate-100 text-slate-700'],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function ringkasKedatangan(PenerimaanBarang $penerimaan): array
+    {
+        $baris = $penerimaan->detailPenerimaanRecordsAsPenerimaan;
+        $dikembalikan = $penerimaan->klaimRecordAsPenerimaan;
+
+        return [
+            'id' => $penerimaan->id_penerimaan,
+            'nomor_po' => $penerimaan->pengiriman->po->nomor_po,
+            'nomor_kontainer' => $penerimaan->pengiriman->nomor_kontainer,
+            'tanggal_tiba' => $penerimaan->tanggal_terima->locale('id')->translatedFormat('d M Y'),
+            'jumlah_invoice' => (int) $baris->sum(fn (DetailPenerimaan $b) => $b->detailPengiriman->jumlah_dikirim),
+            'jumlah_diterima' => (int) $baris->sum('jumlah_diterima'),
+            'jumlah_baik' => (int) $baris->sum('jumlah_baik'),
+            'baris' => $baris->map(fn (DetailPenerimaan $b) => [
+                'id' => $b->id_detail_penerimaan,
+                'kode' => $b->detailPengiriman->detailPo->produk->kode_sku,
+                'nama' => $b->detailPengiriman->detailPo->produk->nama_produk,
+                'maks' => KlaimService::maksimumKlaim($b),
+            ])->values()->all(),
+            'dikembalikan' => $dikembalikan ? [
+                'kode' => KlaimService::kodeKlaim($dikembalikan),
+                'catatan' => $dikembalikan->catatan_pengembalian,
+                'baris' => $dikembalikan->detailKlaimRecords->map(fn (DetailKlaim $d) => [
+                    'id_detail_penerimaan' => $d->id_detail_penerimaan, 'jenis' => $d->jenis_kerusakan, 'karton' => $d->jumlah,
+                ])->values()->all(),
+            ] : null,
+        ];
+    }
+
+    /** @return Builder<PenerimaanBarang> */
+    private function penerimaanDistributor(Distributor $distributor): Builder
+    {
+        return PenerimaanBarang::query()->whereHas('pengiriman.po.forecast', fn ($forecast) => $forecast->where('id_distributor', $distributor->id_distributor));
+    }
+
+    /** Sama dengan modul E-PO: distributor simulasi dipilih lewat session active_distributor_id. */
+    private function distributorAktif(Request $request): ?Distributor
+    {
+        $dipilih = $request->session()->get('active_distributor_id');
+
+        return Distributor::query()->with('wilayah', 'penggunaRecord')->where('status_aktif', true)
+            ->when($dipilih, fn ($query) => $query->whereKey($dipilih))->first()
+            ?? Distributor::query()->with('wilayah', 'penggunaRecord')->where('status_aktif', true)->orderBy('id_distributor')->first();
     }
 }

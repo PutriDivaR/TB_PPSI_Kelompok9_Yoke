@@ -19,6 +19,20 @@
         <span class="inline-flex text-[10px] font-bold px-2 py-1 rounded {{ $klaim['lencana'][1] }}">{{ $klaim['lencana'][0] }}</span>
     </div>
 
+    @if ($klaim['status'] === \App\Services\KlaimService::STATUS_DIKEMBALIKAN)
+        <div class="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <p class="flex items-start gap-3"><i class="fa-solid fa-rotate-left mt-0.5"></i><span><span class="font-bold">Dikembalikan Sales Area Manager:</span> {{ $klaim['catatan_pengembalian'] }}</span></p>
+            <a href="{{ route('klaim.distributor.ajukan', ['penerimaan' => $klaim['id_penerimaan']]) }}" class="px-4 py-2 text-xs font-bold text-white bg-red-600 rounded-lg hover:bg-red-700"><i class="fa-solid fa-pen mr-1"></i>Perbaiki & Ajukan Ulang</a>
+        </div>
+    @endif
+
+    @if ($klaim['status'] === \App\Services\KlaimService::STATUS_SELESAI)
+        <div class="rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-700 text-sm px-4 py-3 flex items-start gap-3">
+            <i class="fa-solid fa-circle-check mt-0.5"></i>
+            <p><span class="font-bold">Diselesaikan Logistik Pusat {{ $tanggalEpo($klaim['tanggal_selesai'], 'd M Y') }}:</span> {{ $klaim['bentuk_penyelesaian'] }}{{ $klaim['catatan_penyelesaian'] ? ' — '.$klaim['catatan_penyelesaian'] : '' }}</p>
+        </div>
+    @endif
+
     <div class="grid lg:grid-cols-3 gap-6 items-start">
 
         {{-- Garis waktu --}}
@@ -34,13 +48,13 @@
                             <span class="relative w-7 h-7 shrink-0 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center"><i class="fa-solid fa-check"></i></span>
                             <div>
                                 <p class="text-sm font-semibold text-slate-900">{{ $t['nama'] }}</p>
-                                <p class="text-[11px] text-emerald-700">{{ $tanggalEpo($t['tanggal'], 'd M Y') }}</p>
+                                <p class="text-[11px] text-emerald-700">{{ $t['tanggal'] ? $tanggalEpo($t['tanggal'], 'd M Y') : '' }}</p>
                             </div>
                         @elseif ($t['status'] === 'berjalan')
                             <span class="relative w-7 h-7 shrink-0 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center ring-4 ring-red-50">{{ $loop->iteration }}</span>
                             <div class="flex-1 rounded-lg bg-red-50 px-3 py-2 -mt-1">
                                 <p class="text-sm font-bold text-red-600">{{ $t['nama'] }}</p>
-                                <p class="text-[11px] text-red-700">Sedang berjalan</p>
+                                <p class="text-[11px] text-red-700">{{ $t['keterangan'] }}</p>
                             </div>
                         @else
                             <span class="relative w-7 h-7 shrink-0 rounded-full bg-slate-100 border border-slate-200 text-slate-400 text-xs font-bold flex items-center justify-center">{{ $loop->iteration }}</span>
@@ -66,7 +80,7 @@
                     <div><dt class="text-[11px] text-slate-500">Tanggal Tiba</dt><dd class="mt-0.5 font-semibold text-slate-900">{{ $tanggalEpo($klaim['tanggal_tiba'], 'd M Y') }}</dd></div>
                     <div><dt class="text-[11px] text-slate-500">Tanggal Pengajuan</dt><dd class="mt-0.5 font-semibold text-slate-900">{{ $tanggalEpo($klaim['tanggal_pengajuan'], 'd M Y') }}</dd></div>
                     <div><dt class="text-[11px] text-slate-500">Total Diklaim</dt><dd class="mt-0.5 font-semibold text-slate-900">{{ number_format($klaim['jumlah_karton'], 0, ',', '.') }} karton</dd></div>
-                    <div class="col-span-2"><dt class="text-[11px] text-slate-500">Jenis Klaim</dt><dd class="mt-0.5 font-semibold text-slate-900">{{ $klaim['jenis'] }}</dd></div>
+                    <div class="col-span-2"><dt class="text-[11px] text-slate-500">Jenis Kerusakan</dt><dd class="mt-0.5 font-semibold text-slate-900">{{ $klaim['jenis'] }}</dd></div>
                     <div><dt class="text-[11px] text-slate-500">Penanggung Jawab</dt><dd class="mt-0.5 font-semibold text-slate-900">{{ $klaim['penanggung'] }}</dd></div>
                 </dl>
             </div>
@@ -83,20 +97,31 @@
                                 <div>
                                     <p class="font-mono text-[10px] font-bold text-slate-500">{{ $baris['kode'] }}</p>
                                     <p class="font-semibold text-slate-900">{{ $baris['nama'] }}</p>
+                                    @if ($baris['catatan_verifikasi'])
+                                        <p class="mt-1 text-xs text-slate-500"><i class="fa-solid fa-comment mr-1"></i>Catatan SAM: {{ $baris['catatan_verifikasi'] }}</p>
+                                    @endif
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <span class="inline-flex text-[10px] font-bold px-2 py-1 rounded bg-slate-100 text-slate-700">{{ $baris['jenis'] }}</span>
-                                    <span class="text-sm font-semibold text-slate-900">{{ number_format($baris['karton'], 0, ',', '.') }} karton</span>
+                                    <div class="text-right">
+                                        <p class="text-sm font-semibold text-slate-900">{{ number_format($baris['karton'], 0, ',', '.') }} karton</p>
+                                        @if ($baris['terverifikasi'] !== null)
+                                            <p class="text-[11px] {{ $baris['terverifikasi'] !== $baris['karton'] ? 'text-red-600 font-bold' : 'text-emerald-700' }}">Terverifikasi {{ number_format($baris['terverifikasi'], 0, ',', '.') }}</p>
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
                             <div class="mt-3 flex flex-wrap gap-3">
-                                {{-- shortcut: data contoh belum punya berkas foto, jadi tampil placeholder; ganti dengan <img> dari FotoBukti saat tersambung. --}}
-                                @foreach ($baris['foto'] as $foto)
-                                    <div class="w-24 h-24 rounded-lg border border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 px-1 text-center" title="{{ $foto }}">
-                                        <i class="fa-solid fa-image text-xl text-slate-300"></i>
-                                        <span class="text-[9px] text-slate-500 break-all leading-tight">{{ $foto }}</span>
-                                    </div>
-                                @endforeach
+                                @forelse ($baris['foto'] as $foto)
+                                    <a href="{{ $foto['url'] }}" target="_blank" class="relative block w-24 h-24">
+                                        <img src="{{ $foto['url'] }}" alt="Foto bukti {{ $baris['nama'] }}" class="w-24 h-24 object-cover rounded-lg border border-slate-200">
+                                        @if ($foto['sumber'] === 'SAM')
+                                            <span class="absolute bottom-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">SAM</span>
+                                        @endif
+                                    </a>
+                                @empty
+                                    <p class="text-xs text-slate-400">Belum ada foto bukti.</p>
+                                @endforelse
                             </div>
                         </div>
                     @endforeach
@@ -112,13 +137,12 @@
                             <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Berita Acara Kerusakan</p>
                             <p class="mt-1 font-mono text-[10px] font-bold text-red-600">{{ $klaim['bak']['kode'] }}</p>
                             <p class="text-sm text-slate-700">Disahkan {{ $tanggalEpo($klaim['bak']['tanggal'], 'd M Y') }} oleh <span class="font-semibold text-slate-900">{{ $klaim['bak']['pengesah'] }}</span></p>
-                            <p class="text-[11px] text-slate-500">{{ $klaim['bak']['jabatan'] }}</p>
+                            <p class="text-[11px] text-slate-500">Sales Area Manager</p>
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        {{-- Dokumen BAK belum dibuat; kedua tombol sementara href="#". --}}
-                        <a href="#" class="text-[11px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i>Pratinjau</a>
-                        <a href="#" class="text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded"><i class="fa-solid fa-download mr-1"></i>Unduh</a>
+                        <a href="{{ $klaim['bak']['url'] }}" target="_blank" class="text-[11px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i>Pratinjau</a>
+                        <a href="{{ $klaim['bak']['url'] }}?cetak=1" target="_blank" class="text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded"><i class="fa-solid fa-download mr-1"></i>Unduh</a>
                     </div>
                 </div>
             @endif
