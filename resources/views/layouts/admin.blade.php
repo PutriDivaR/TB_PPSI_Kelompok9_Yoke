@@ -5,19 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Portal Admin') - PT Yoke Food Industries Indonesia</title>
 
-    <!-- Tailwind CSS CDN dengan konfigurasi tema -->
+    <!-- Tailwind CSS (Vite + CDN Fallback) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        admin: {
-                            navy: '#0B132B',
-                            slate: '#1E293B',
-                            bg: '#EFF5F9',
+                        brand: {
                             red: '#DC2626',
-                            green: '#047857'
+                            dark: '#1E293B'
                         }
                     },
                     fontFamily: {
@@ -27,6 +24,9 @@
             }
         }
     </script>
+    @if(file_exists(public_path('build/manifest.json')))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @endif
 
     <!-- Google Fonts Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -47,9 +47,11 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-[#EFF5F9] text-slate-800 antialiased min-h-screen flex" 
+<body class="bg-slate-100/80 font-sans antialiased text-slate-800" 
       x-data="{ 
+          sidebarOpen: window.innerWidth >= 1024,
           showLogoutModal: false,
+          showProfileModal: {{ $errors->hasAny(['nama', 'kata_sandi', 'kata_sandi_confirmation', 'foto_profil']) ? 'true' : 'false' }},
           toasts: [],
           addToast(message, type = 'success') {
               const id = Date.now();
@@ -59,70 +61,61 @@
               }, 3500);
           }
       }"
-      @show-toast.window="addToast($event.detail.message, $event.detail.type)">
+      @show-toast.window="addToast($event.detail.message, $event.detail.type)"
+      @open-logout-modal.window="showLogoutModal = true"
+      @open-profile-modal.window="showProfileModal = true">
 
-    <!-- Sidebar Portal Admin -->
-    @include('layouts.partials.admin-sidebar')
+    <div class="min-h-screen flex flex-col">
+        <!-- Header Atas (Persis seperti modul lain) -->
+        @include('layouts.partials.header')
 
-    <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto min-h-screen p-8 lg:p-10">
-        
-        <!-- Quick Control Utility (Reset Demo Data & Environment Tag) -->
-        <div class="mb-4 flex items-center justify-between text-xs text-slate-400">
-            <div class="flex items-center space-x-2">
-                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span class="font-medium text-slate-500">Mode Desain Frontend Terpadu &middot; Simpanan Otomatis (Local Store)</span>
-            </div>
-            <div class="flex items-center space-x-3">
-                <button @click="if(confirm('Reset semua data kembali ke data contoh dokumen?')) adminStore.resetAll()" 
-                        type="button" 
-                        class="hover:text-red-600 transition flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs">
-                    <i class="fa-solid fa-rotate-left text-[10px]"></i>
-                    <span>Reset Data Dummy Dokumen</span>
-                </button>
-            </div>
-        </div>
+        <div class="flex flex-1 pt-16">
+            <!-- Sidebar Navigation (Persis seperti modul lain) -->
+            @include('layouts.partials.admin-sidebar')
 
-        <!-- Page Yield Content -->
-        <div class="flex-1">
-            @yield('content')
-        </div>
+            <!-- Main Content Area & Footer -->
+            <div :class="sidebarOpen ? 'ml-64' : 'ml-0'" class="min-w-0 flex-1 flex flex-col min-h-[calc(100vh-4rem)] transition-all duration-300">
+                <main class="flex-1 p-4 lg:p-8 space-y-4">
+                    {{-- Alert Flash Message --}}
+                    @if(session('success'))
+                        <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold px-4 py-3 rounded-xl flex items-center justify-between shadow-2xs">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+                                <span>{{ session('success') }}</span>
+                            </div>
+                            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    @endif
 
-        <!-- Footer Notice Sesuai Dokumen -->
-        <footer class="mt-12 pt-6 border-t border-slate-200/80 text-xs text-slate-400">
-            Data pada tampilan ini adalah contoh untuk keperluan desain.
-        </footer>
-    </main>
+                    @if(session('error'))
+                        <div class="bg-red-50 border border-red-200 text-red-800 text-xs font-semibold px-4 py-3 rounded-xl flex items-center justify-between shadow-2xs">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-circle-exclamation text-red-600 text-sm"></i>
+                                <span>{{ session('error') }}</span>
+                            </div>
+                            <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    @endif
 
-    <!-- Logout Confirmation Modal (Simulasi Frontend) -->
-    <div x-cloak x-show="showLogoutModal" 
-         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100"
-             @click.away="showLogoutModal = false">
-            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl mb-4 mx-auto">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            </div>
-            <h3 class="text-base font-bold text-slate-900 text-center">Keluar dari Portal Admin?</h3>
-            <p class="text-xs text-slate-500 text-center mt-2 leading-relaxed">
-                Anda akan mengakhiri sesi simulasi administrator Rina Wulandari.
-            </p>
-            <div class="mt-6 flex space-x-3">
-                <button @click="showLogoutModal = false" 
-                        type="button" 
-                        class="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition">
-                    Batal
-                </button>
-                <button @click="showLogoutModal = false; showToast('Berhasil keluar dari sesi simulasi admin.', 'info')" 
-                        type="button" 
-                        class="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow-md transition">
-                    Ya, Keluar
-                </button>
+                    @if($errors->any() && !$errors->hasAny(['nama', 'kata_sandi', 'kata_sandi_confirmation', 'foto_profil']))
+                        <div class="bg-red-50 border border-red-200 text-red-800 text-xs font-semibold px-4 py-3 rounded-xl shadow-2xs space-y-1">
+                            <div class="font-bold flex items-center space-x-1.5 text-red-700 mb-1">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                <span>Terjadi kesalahan validasi:</span>
+                            </div>
+                            @foreach($errors->all() as $err)
+                                <div class="ml-5 list-disc">• {{ $err }}</div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @yield('content')
+                </main>
+                @include('layouts.partials.footer')
             </div>
         </div>
     </div>
@@ -130,7 +123,7 @@
     <!-- Floating Toast Notification Container -->
     <div class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none">
         <template x-for="toast in toasts" :key="toast.id">
-            <div class="pointer-events-auto flex items-center space-x-3 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold border transition-all duration-300 animate-slide-up"
+            <div class="pointer-events-auto flex items-center space-x-3 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold border transition-all duration-300"
                  :class="{
                      'bg-slate-900 text-white border-slate-800': toast.type === 'info',
                      'bg-emerald-600 text-white border-emerald-700': toast.type === 'success',
@@ -146,7 +139,11 @@
         </template>
     </div>
 
+    <!-- Profile Modal & Logout Modal -->
+    @include('layouts.partials.profile-modal')
+    @include('layouts.partials.logout-modal')
+
     @yield('scripts')
+    @stack('scripts')
 </body>
 </html>
-
