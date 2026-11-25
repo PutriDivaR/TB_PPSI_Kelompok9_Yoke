@@ -48,7 +48,7 @@
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full text-sm min-w-[900px]">
+            <table class="w-full text-sm min-w-[1080px]">
                 <thead class="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
                     <tr>
                         <th class="px-5 py-3 text-left">Kode Klaim</th>
@@ -57,13 +57,19 @@
                         <th class="px-5 py-3 text-right">Jumlah</th>
                         <th class="px-5 py-3 text-left">Diajukan</th>
                         <th class="px-5 py-3 text-right">Lama Menunggu</th>
+                        <th class="px-5 py-3 text-left">Jadwal Kunjungan</th>
                         <th class="px-5 py-3 text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($antrean as $klaim)
                         <tr class="hover:bg-slate-50" x-show="@js(strtolower($klaim['distributor'].' '.$klaim['nomor_kontainer'])).includes(q.toLowerCase())">
-                            <td class="px-5 py-3 font-mono text-[10px] font-bold text-red-600">{{ $klaim['kode'] }}</td>
+                            <td class="px-5 py-3">
+                                <p class="font-mono text-[10px] font-bold text-red-600">{{ $klaim['kode'] }}</p>
+                                @if ($klaim['catatan_logistik'])
+                                    <p class="mt-1 inline-flex text-[10px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-700" title="{{ $klaim['catatan_logistik'] }}">Dikembalikan Logistik</p>
+                                @endif
+                            </td>
                             <td class="px-5 py-3"><p class="font-semibold text-slate-900">{{ $klaim['distributor'] }}</p><p class="text-[11px] text-slate-500">{{ $klaim['kota'] }}</p></td>
                             <td class="px-5 py-3">{{ $klaim['nomor_kontainer'] }}</td>
                             <td class="px-5 py-3 text-right font-semibold">{{ number_format($klaim['jumlah_karton'], 0, ',', '.') }} karton</td>
@@ -71,13 +77,22 @@
                             <td class="px-5 py-3 text-right {{ $klaim['lama_menunggu'] > $batasHariMenunggu ? 'font-bold text-red-600' : 'text-slate-700' }}">
                                 {{ number_format($klaim['lama_menunggu'], 0, ',', '.') }} hari
                             </td>
+                            <td class="px-5 py-3">
+                                <form method="POST" action="{{ route('klaim.sam.jadwal', $klaim['id']) }}" class="flex items-center gap-2">
+                                    @csrf
+                                    <input type="date" name="jadwal_kunjungan" required min="{{ now()->toDateString() }}" value="{{ $klaim['jadwal_kunjungan']?->toDateString() }}"
+                                           aria-label="Jadwal kunjungan {{ $klaim['kode'] }}"
+                                           class="px-2 py-1 text-xs border rounded-lg {{ $klaim['jadwal_kunjungan']?->isToday() ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-slate-200' }}">
+                                    <button class="text-[11px] font-semibold text-slate-600 border border-slate-200 px-2 py-1 rounded hover:bg-slate-50">Simpan</button>
+                                </form>
+                            </td>
                             <td class="px-5 py-3 text-center">
                                 <a href="{{ route('klaim.sam.verifikasi', $klaim['id']) }}" class="inline-block text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded">Mulai Verifikasi</a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-5 py-12 text-center">
+                            <td colspan="8" class="px-5 py-12 text-center">
                                 <i class="fa-solid fa-clipboard-check text-3xl text-slate-300"></i>
                                 <p class="mt-3 font-bold text-slate-700">Tidak ada klaim yang menunggu verifikasi</p>
                                 <p class="mt-1 text-xs text-slate-500">Klaim baru dari distributor di wilayah kerja Anda akan tampil di sini.</p>

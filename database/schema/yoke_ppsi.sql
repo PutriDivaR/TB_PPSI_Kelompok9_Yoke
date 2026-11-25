@@ -216,6 +216,10 @@ CREATE TABLE `klaim` (
   `tanggal_pengajuan` DATETIME NOT NULL,
   `status` VARCHAR(40) NOT NULL,
   `tanggal_penyelesaian` DATETIME NULL,
+  `jadwal_kunjungan` DATE NULL,
+  `catatan_pengembalian` TEXT NULL,
+  `bentuk_penyelesaian` VARCHAR(40) NULL,
+  `catatan_penyelesaian` TEXT NULL,
   PRIMARY KEY (`id_klaim`),
   CONSTRAINT `uq_klaim_id_penerimaan` UNIQUE (`id_penerimaan`),
   CONSTRAINT `fk_klaim_id_penerimaan` FOREIGN KEY (`id_penerimaan`) REFERENCES `penerimaan_barang` (`id_penerimaan`) ON UPDATE RESTRICT ON DELETE RESTRICT
@@ -271,10 +275,13 @@ CREATE TABLE `detail_klaim` (
   `jumlah` INT NOT NULL,
   `penanggung_jawab` VARCHAR(40) NOT NULL,
   `status_verifikasi` VARCHAR(40) NOT NULL,
+  `jumlah_terverifikasi` INT NULL,
+  `catatan_verifikasi` VARCHAR(255) NULL,
   PRIMARY KEY (`id_detail_klaim`),
   CONSTRAINT `fk_detail_klaim_id_klaim` FOREIGN KEY (`id_klaim`) REFERENCES `klaim` (`id_klaim`) ON UPDATE RESTRICT ON DELETE RESTRICT,
   CONSTRAINT `fk_detail_klaim_id_detail_penerimaan` FOREIGN KEY (`id_detail_penerimaan`) REFERENCES `detail_penerimaan` (`id_detail_penerimaan`) ON UPDATE RESTRICT ON DELETE RESTRICT,
-  CONSTRAINT `ck_detail_klaim_1` CHECK (jumlah > 0)
+  CONSTRAINT `ck_detail_klaim_1` CHECK (jumlah > 0),
+  CONSTRAINT `ck_detail_klaim_2` CHECK (jumlah_terverifikasi IS NULL OR (jumlah_terverifikasi >= 0 AND jumlah_terverifikasi <= jumlah))
 ) ENGINE=InnoDB;
 
 CREATE TABLE `foto_bukti` (
@@ -282,6 +289,7 @@ CREATE TABLE `foto_bukti` (
   `id_detail_klaim` BIGINT UNSIGNED NOT NULL,
   `path_berkas` VARCHAR(255) NOT NULL,
   `tanggal_unggah` DATETIME NOT NULL,
+  `sumber` VARCHAR(20) NULL,
   PRIMARY KEY (`id_foto`),
   CONSTRAINT `fk_foto_bukti_id_detail_klaim` FOREIGN KEY (`id_detail_klaim`) REFERENCES `detail_klaim` (`id_detail_klaim`) ON UPDATE RESTRICT ON DELETE RESTRICT
 ) ENGINE=InnoDB;

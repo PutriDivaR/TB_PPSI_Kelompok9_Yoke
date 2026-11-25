@@ -27,9 +27,9 @@ class EpoService
     // Logika perhitungan rekomendasi (Sell-out 3 bulan terakhir - stok layak jual) / karton_per_kontainer
     public static function hitungRekomendasi(int $distributorId, string $periode): array
     {
-        $carbonPeriode = Carbon::parse($periode);
-        $startDate = $carbonPeriode->copy()->subMonths(3)->startOfMonth();
-        $endDate = $carbonPeriode->copy()->subMonth()->endOfMonth();
+        $carbonPeriode = Carbon::parse($periode)->startOfMonth();
+        $endDate = $carbonPeriode->copy()->subYear()->endOfMonth();
+        $startDate = $endDate->copy()->subMonths(2)->startOfMonth();
         $sellOutByProduct = SellOut::query()->where('id_distributor', $distributorId)
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->selectRaw('id_produk, SUM(jumlah) AS total')

@@ -1,73 +1,179 @@
-# Waypoint — Integrasi Database Kelompok 9
+# Waypoint
 
-Dasar kode: cabang `suci`, commit `2d4810f` (frontend Admin), yang sudah memuat kode `main`. Perubahan integrasi berada di cabang lokal `integrasi-database-hasbi` dan belum di-push ke GitHub.
+Waypoint adalah aplikasi berbasis Laravel untuk pengelolaan data penjualan, distribusi, E-PO, forecast, klaim, monitoring pengiriman, dan pelaporan PT Yoke.
 
-## Menjalankan di Laragon
+## Gambaran Sistem
 
-Gunakan PHP 8.5 sesuai dependensi terkunci repo. PHP 8.3 tidak kompatibel dengan sebagian paket Symfony dalam composer.lock. Nyalakan MySQL melalui Laragon.
+Repositori ini merupakan prototipe modul operasional dengan simulasi aktor:
+
+| Peran | Fungsionalitas utama |
+| --- | --- |
+| Distributor | Forecast, pengajuan E-PO, katalog SKU, status PO, dan dokumen selesai |
+| Logistik Pusat | Antrean forecast, penetapan kuota, verifikasi E-PO, serta pratinjau PO |
+| SAM | Verifikasi, pengesahan klaim, dan laporan area |
+| Admin | Ringkasan, pengguna, distributor, produk, tahun fiskal, dan log aktivitas |
+
+Autentikasi produksi belum diterapkan. Pemilihan aktor pada prototipe menggunakan session simulasi dan dibatasi ke lingkungan lokal/tes pada modul yang masih memakai middleware simulasi.
+
+## Modul E-PO dan Forecast
+
+### Alur bisnis
+
+1. **Distributor membuat Forecast**
+   - Sistem menampilkan seluruh SKU aktif beserta rekomendasi histori penjualan.
+   - Forecast ditujukan sebagai **target kedatangan stok**, bukan sekadar kebutuhan bulan berjalan.
+   - Periode digunakan untuk horizon perencanaan 5 bulan ke depan.
+   - Untuk setiap bulan target, distributor mengisi jumlah usulan dalam karton; SKU yang tidak dibutuhkan bernilai 0.
+
+2. **Logistik menetapkan kuota**
+   - Forecast berstatus Diajukan masuk antrean Logistik.
+   - Logistik dapat menyetujui seluruh usulan sekaligus.
+   - Jika kuota dikurangi, Logistik mengisi catatan penyesuaian.
+   - Kuota per SKU disimpan pada `detail_forecast.jumlah_disetujui`.
+
+3. **Distributor mengajukan E-PO**
+   - Hanya Forecast berstatus Disetujui dan masih memiliki sisa kuota yang dapat dipakai.
+   - Distributor mencari SKU, menambahnya ke daftar pesanan, dan mengubah jumlah karton.
+   - Katalog menampilkan kode SKU, nama, kategori, harga, kuota, dan sisa kuota.
+   - Minimum pesanan adalah 2.000 karton atau 1 kontainer.
+   - Pengajuan diblokir jika jumlah melebihi sisa kuota atau total kurang dari minimum order.
+
+4. **Logistik memverifikasi E-PO**
+   - Sistem memeriksa minimum order, produk pada Forecast, sisa kuota, status Forecast, serta identitas distributor.
+   - Setelah lolos, Logistik menyetujui E-PO.
+   - E-PO berubah menjadi PO resmi dan dapat dicetak atau disimpan sebagai PDF melalui fungsi cetak browser.
+
+5. **Riwayat dan status**
+   - Distributor dapat melihat riwayat Forecast dan riwayat E-PO pada dashboard.
+   - Forecast lama hanya ditampilkan sebagai riwayat dan tidak dapat diubah.
+   - E-PO lama tidak dapat dihapus setelah diproses atau disetujui.
+
+### Lead time dan cutoff
+
+- Sistem memakai cutoff pengajuan tanggal 15 setiap bulan.
+- Forecast dapat direncanakan hingga 5 bulan ke depan.
+- Estimasi awal pengiriman memakai lead time 60–75 hari.
+- Setelah data pengiriman dibuat pada modul Monitoring, estimasi awal dapat digantikan oleh `eta_awal` dan `eta_terkini` yang dikelola modul pengiriman.
+- Informasi gelombang, cutoff, dan ETA ditampilkan pada:
+  - Formulir Input E-PO distributor
+  - Verifikasi E-PO logistik
+  - Dokumen PO distributor
+
+Catatan: tanggal cutoff, horizon Forecast, minimum order, dan estimasi lead time saat ini berupa konstanta Controller untuk memudahkan penyesuaian. Belum ada kolom konfigurasi tambahan pada database.
+
+### Struktur tabel E-PO
+
+| Tabel | Fungsi |
+| --- | --- |
+| `forecast` | Induk Forecast dan target periode |
+| `detail_forecast` | Usulan dan kuota per produk |
+| `purchase_order` | Induk E-PO/PO |
+| `detail_po` | Baris produk pada E-PO/PO |
+| `pengiriman` | Nomor kontainer, vessel, dan ETA aktual |
+| `detail_pengiriman` | Kuantitas produk yang dikirim |
+| `penerimaan_barang` | Pencatatan kedatangan |
+| `detail_penerimaan` | Kuantitas diterima dan kondisi barang |
+
+E-PO tidak menambah kolom cutoff atau ETA pada tabel. Nilai tersebut dihitung dari tanggal pengajuan dan data pengiriman yang sudah tersedia.
+
+## Struktur Direktori
+
+```text
+app/
+  Http/Controllers/
+    EPO/                 Controller Forecast dan E-PO
+    Klaim/               Controller modul klaim
+    Api/V1/              API Forecast, PO, Shipment, laporan, dan autentikasi
+  Models/                Model Eloquent sesuai ERD
+  Services/              Logika rekomendasi dan layanan pelaporan
+
+resources/views/
+  layouts/               Layout, header, sidebar, dan notifikasi
+  pages/
+    e-po/                Tampilan Distributor dan Logistik
+    klaim/
+    pelaporan/
+    admin/
+
+routes/
+  web.php                Rute simulasi dan halaman web
+  api.php                Rute API
+
+database/
+  schema/                ERD SQL dan metadata skema
+  factories/             Factory pengujian
+
+tests/
+  Feature/               Pengujian fitur HTTP dan database
+```
+
+## Persyaratan
+
+- PHP 8.3 atau lebih baru
+- Composer
+- Node.js dan npm
+- MySQL 8.4 atau kompatibel
+- Laravel 13
+
+## Instalasi
 
 ```powershell
 composer install
 Copy-Item .env.example .env
 php artisan key:generate
-npm ci --ignore-scripts
+npm install
 npm run build
-php artisan yoke:database-check
+```
+
+Buat database MySQL kosong, misalnya `yoke_ppsi`, lalu sesuaikan `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` pada `.env`.
+
+```powershell
+php artisan yoke:database-install
 php artisan serve --host=127.0.0.1 --port=8001
 ```
 
-Di laptop Hasbi, `.env` sudah disiapkan memakai MySQL `127.0.0.1:3306`, database `yoke_ppsi`, username `root`, password kosong. `.env` tidak masuk Git. Session dan cache memakai file, queue memakai sync, sehingga tidak membutuhkan tabel framework tambahan.
+Perintah installer membuat dan memeriksa skema ERD tanpa menghapus data pada database yang sudah berisi tabel.
 
-- Pelaporan terintegrasi: http://127.0.0.1:8001/pelaporan
-- Status database: http://127.0.0.1:8001/integrasi-database/status
-- E-PO kelompok: http://127.0.0.1:8001/distributor
-- Portal Admin kelompok: http://127.0.0.1:8001/simulasi/admin
+## Alamat Modul
 
-Di laptop ini, `jalankan-web.bat` menjalankan PHP 8.5 Laragon yang sudah terpasang.
+- Dashboard Distributor: `http://127.0.0.1:8001/distributor`
+- Antrean Logistik: `http://127.0.0.1:8001/logistik`
+- Modul Pelaporan: `http://127.0.0.1:8001/pelaporan`
+- Portal Admin: `http://127.0.0.1:8001/simulasi/admin`
+- Status Database: `http://127.0.0.1:8001/integrasi-database/status`
 
-## Menyiapkan database pada laptop anggota lain
-
-Buat database MySQL kosong bernama `yoke_ppsi` melalui phpMyAdmin, sesuaikan `.env`, lalu:
+## Route Utama E-PO
 
 ```text
-php artisan yoke:database-install
+GET    /e-po/distributor/hitung-forecast
+GET    /e-po/distributor/ajukan-forecast
+POST   /e-po/distributor/ajukan-forecast
+GET    /e-po/distributor/input-epo
+POST   /e-po/distributor/input-epo
+GET    /e-po/distributor/epo-selesai/{po?}
+
+GET    /e-po/logistik/antrean
+GET    /e-po/logistik/forecast/{forecast}
+POST   /e-po/logistik/forecast/{forecast}/tetapkan
+GET    /e-po/logistik/epo/{po}/verifikasi
+POST   /e-po/logistik/epo/{po}/setujui
 ```
 
-Installer memakai database yang dipilih dalam `.env` (tidak memaksa nama tertentu), membuat 23 tabel, 31 FK, 18 trigger integritas, dan empat peran. Jika database sudah berisi tabel, installer hanya memeriksa skema dan tidak menimpa data. Skema parsial ditolak agar dapat diperiksa manual. MySQL 8.4+ diperlukan.
-
-Skema yang sama tersedia di `database/schema/yoke_ppsi.sql` untuk impor manual. Metadata ERD ada di `database/schema/schema_erd.json`. Jangan menjalankan `migrate:fresh` pada database yang berisi data. Migrasi bawaan Laravel masih merupakan berkas asli repo; setup ERD menggunakan perintah khusus di atas.
-
-## Yang sudah terhubung
-
-- 23 model Eloquent mengikuti nama tabel, PK, FK, tipe data, dan tanpa created_at/updated_at yang tidak ada pada ERD.
-- Model `Pengguna` memakai `kata_sandi` ter-hash; alias `User` mengarah ke model itu untuk persiapan autentikasi. Ini belum menambahkan login aplikasi.
-- Modul Pelaporan membaca transaksi MySQL, menyimpan Sell-Out, dan membuat/memperbarui snapshot stok berdasarkan distributor–produk–tanggal.
-- Filter tanggal, distributor, tahun fiskal, daftar transaksi, dan ekspor CSV memakai data database.
-- Sell-In dihitung dari transaksi pengiriman, bukan disamakan dengan barang diterima. Rekonsiliasi memakai stok layak jual awal + penerimaan baik − Sell-Out setelah snapshot awal. Tanpa saldo awal atau snapshot pada tanggal akhir yang sesuai, sistem menampilkan kebutuhan data, bukan mengasumsikan nol.
-- Formulir memakai validasi, CSRF, dan transaksi database. Stok layak jual harus antara nol dan stok fisik.
-
-## Batas integrasi saat ini
-
-E-PO dan Admin tetap mempertahankan UI kelompok beserta data contoh/localStorage asalnya. Monitoring dan klaim belum diimplementasikan di repo ini. Model dan relasinya sudah siap, tetapi controller masing-masing modul masih harus dihubungkan ke model tersebut. Perbaikan rute yang ditemukan pada E-PO sudah disertakan.
-
-Pemilih peran masih simulasi lokal dari repo, bukan autentikasi. Pada Pelaporan, sesi Distributor dibatasi pada perusahaan yang dipilih melalui konteks simulasi; Logistik/SAM/Admin membaca laporan, sedangkan penulisan dilakukan Distributor. Perusahaan simulasi dapat diganti secara eksplisit di halaman. Karena belum ada login, seluruh endpoint Pelaporan dan status database dibatasi ke APP_ENV local/testing; jangan menganggap ini otorisasi produksi.
-
-Database utama tidak diisi transaksi contoh secara otomatis. Bila kosong, isi master distributor dan produk yang sebenarnya melalui SQL/phpMyAdmin atau lanjutkan backend Admin. Form Admin yang masih berupa localStorage belum mengisi master MySQL.
+Perpindahan antarperan menggunakan route Laravel, bukan parameter query `?role=...`.
 
 ## Pengujian
 
-```text
-php artisan test --compact
-```
-
-Pengujian default memakai SQLite in-memory yang mengikuti kolom/FK metadata ERD. Untuk menguji jalur MySQL nyata, buat database khusus dengan nama berakhiran `_test`, misalnya `yoke_ppsi_integrasi_test`, lalu set environment proses:
-
 ```powershell
-$env:DB_CONNECTION='mysql'
-$env:DB_DATABASE='yoke_ppsi_integrasi_test'
-php artisan test --compact tests/Feature/PelaporanDatabaseTest.php
-Remove-Item Env:\DB_CONNECTION
-Remove-Item Env:\DB_DATABASE
+php artisan test --compact
+npm run build
 ```
 
-Data fixture tiap pengujian dibungkus transaksi dan di-rollback. Test menolak database MySQL yang namanya tidak berakhiran `_test`. Database utama `yoke_ppsi` tidak dipakai untuk pengujian tulis.
+Pengujian fitur menggunakan SQLite in-memory. Seluruh perubahan database pada pengujian memakai data terisolasi dan tidak menimpa database MySQL utama.
+
+## Catatan Pengembangan
+
+- Jangan menjalankan `migrate:fresh` pada database yang berisi data produksi atau simulasi.
+- Gunakan `php artisan yoke:database-check` untuk memeriksa kesesuaian ERD.
+- Pertahankan satuan karton pada modul Forecast dan E-PO meskipun nama kolom lama menggunakan `jumlah_kontainer`.
+- Satu distributor hanya boleh memiliki satu Forecast aktif untuk kombinasi distributor dan periode.
+- Hak akses produksi perlu ditambahkan sebelum aplikasi dipakai secara operasional.

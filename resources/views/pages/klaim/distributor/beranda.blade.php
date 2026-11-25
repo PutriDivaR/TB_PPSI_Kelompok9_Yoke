@@ -10,10 +10,18 @@
 
     @include('layouts.partials.flash')
 
+    @if (! $distributor)
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center">
+        <i class="fa-solid fa-store-slash text-3xl text-slate-300"></i>
+        <h2 class="mt-3 text-lg font-bold text-slate-900">Belum ada distributor aktif</h2>
+        <p class="mt-1 text-sm text-slate-500">Tambahkan data distributor dengan status aktif terlebih dahulu untuk memakai modul klaim.</p>
+    </div>
+    @else
+
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h1 class="text-xl font-bold text-slate-900">Beranda Klaim & Retur Barang</h1>
-            <p class="text-sm text-slate-500">{{ $distributor['nama'] }} &middot; {{ $distributor['wilayah'] }}</p>
+            <p class="text-sm text-slate-500">{{ $distributor->nama }} &middot; {{ $distributor->wilayah?->nama_wilayah }}</p>
         </div>
         <a href="{{ route('klaim.distributor.ajukan') }}" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700">
             <i class="fa-solid fa-plus"></i> Ajukan Klaim Baru
@@ -28,12 +36,17 @@
         </div>
         <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
             <div class="flex justify-between"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Sisa Waktu Penyortiran</p><i class="fa-solid fa-stopwatch text-red-500"></i></div>
-            @if ($stats['sisa_hari_sortir'] >= 0)
-                <p class="mt-2 text-3xl font-extrabold text-slate-900">{{ number_format($stats['sisa_hari_sortir'], 0, ',', '.') }} <span class="text-xs text-slate-500">Hari</span></p>
+            @if ($stats['sisa_hari_sortir'] === null)
+                <p class="mt-2 text-3xl font-extrabold text-slate-900">-</p>
+                <p class="text-[10px] text-slate-500">Tidak ada kedatangan yang belum diklaim</p>
             @else
-                <p class="mt-2 text-3xl font-extrabold text-red-600">Lewat <span class="text-xs text-slate-500">{{ number_format(abs($stats['sisa_hari_sortir']), 0, ',', '.') }} hari</span></p>
+                @if ($stats['sisa_hari_sortir'] >= 0)
+                    <p class="mt-2 text-3xl font-extrabold text-slate-900">{{ number_format($stats['sisa_hari_sortir'], 0, ',', '.') }} <span class="text-xs text-slate-500">Hari</span></p>
+                @else
+                    <p class="mt-2 text-3xl font-extrabold text-red-600">Lewat <span class="text-xs text-slate-500">{{ number_format(abs($stats['sisa_hari_sortir']), 0, ',', '.') }} hari</span></p>
+                @endif
+                <p class="text-[10px] text-slate-500">{{ $kedatanganTerakhir->pengiriman->nomor_kontainer }} &middot; batas {{ $tanggalEpo($batasPenyortiran, 'd M Y') }}</p>
             @endif
-            <p class="text-[10px] text-slate-500">{{ $kedatanganTerakhir['nomor_kontainer'] }} &middot; batas {{ $tanggalEpo($batasPenyortiran, 'd M Y') }}</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
             <div class="flex justify-between"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Klaim Selesai Bulan Ini</p><i class="fa-solid fa-circle-check text-emerald-500"></i></div>
@@ -41,7 +54,7 @@
             <p class="text-[10px] text-slate-500">Diselesaikan pada {{ $tanggalEpo(now(), 'F Y') }}</p>
         </div>
         <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <div class="flex justify-between"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Karton Diklaim {{ $tahunFiskal['label'] }}</p><i class="fa-solid fa-boxes-stacked text-blue-500"></i></div>
+            <div class="flex justify-between"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Karton Diklaim {{ $tahunFiskal ? 'FY-'.$tahunFiskal->tanggal_mulai->year : '' }}</p><i class="fa-solid fa-boxes-stacked text-blue-500"></i></div>
             <p class="mt-2 text-3xl font-extrabold text-slate-900">{{ number_format($stats['karton_tahun_fiskal'], 0, ',', '.') }} <span class="text-xs text-slate-500">Karton</span></p>
             <p class="text-[10px] text-slate-500">Akumulasi pengajuan tahun fiskal berjalan</p>
         </div>
@@ -103,12 +116,7 @@
                             <td class="px-5 py-3"><p class="font-semibold text-slate-900">{{ $klaim['penanggung'] }}</p><p class="text-[11px] text-slate-500">{{ $klaim['jenis'] }}</p></td>
                             <td class="px-5 py-3"><span class="inline-flex text-[10px] font-bold px-2 py-1 rounded {{ $klaim['lencana'][1] }}">{{ $klaim['lencana'][0] }}</span></td>
                             <td class="px-5 py-3 text-center">
-                                @if ($klaim['punya_detail'])
-                                    <a href="{{ route('klaim.distributor.detail', $klaim['id']) }}" class="text-[11px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i>Lihat Detail</a>
-                                @else
-                                    {{-- Sementara: hanya dua klaim yang punya data contoh detail. --}}
-                                    <span class="text-[11px] font-semibold text-slate-300 border border-slate-100 px-3 py-1.5 rounded cursor-not-allowed" title="Data contoh detail belum tersedia"><i class="fa-regular fa-eye mr-1"></i>Lihat Detail</span>
-                                @endif
+                                <a href="{{ route('klaim.distributor.detail', $klaim['id']) }}" class="text-[11px] font-semibold text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50"><i class="fa-regular fa-eye mr-1"></i>{{ $klaim['status'] === \App\Services\KlaimService::STATUS_DIKEMBALIKAN ? 'Perbaiki' : 'Lihat Detail' }}</a>
                             </td>
                         </tr>
                     @empty
@@ -124,5 +132,6 @@
             </table>
         </div>
     </div>
+    @endif
 </div>
 @endsection
