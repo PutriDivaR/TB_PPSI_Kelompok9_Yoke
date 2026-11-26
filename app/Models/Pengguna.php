@@ -28,6 +28,16 @@ class Pengguna extends Authenticatable
         return 'kata_sandi';
     }
 
+    public function getFotoProfilUrlAttribute(): string
+    {
+        $customPath = "uploads/avatars/{$this->id_pengguna}.png";
+        if (file_exists(public_path($customPath))) {
+            return asset($customPath) . '?v=' . filemtime(public_path($customPath));
+        }
+
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->nama) . '&background=1E293B&color=fff';
+    }
+
     protected function casts(): array
     {
         return [

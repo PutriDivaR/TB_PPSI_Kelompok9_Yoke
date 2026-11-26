@@ -24,7 +24,8 @@
         <!-- Navigation items rendered per Role -->
         <nav class="p-4 space-y-5 text-xs">
             
-            <!-- Dashboard (Semua Aktor) -->
+            <!-- Dashboard (Semua Aktor Kecuali Admin) -->
+            @if($currentRole !== 'admin')
             <div>
                 <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Utama</div>
                 <a href="{{ route($roleHomeRoutes[$currentRole] ?? 'simulation.distributor') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition">
@@ -32,6 +33,7 @@
                     <span>Dashboard {{ ucfirst($currentRole) }}</span>
                 </a>
             </div>
+            @endif
 
             <!-- MENU DISTRIBUTOR -->
             @if($currentRole === 'distributor')
@@ -94,31 +96,49 @@
 
             <!-- MENU ADMIN -->
             @if($currentRole === 'admin')
+            <!-- Ringkasan -->
             <div>
-                <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Master Data & Admin</div>
+                <a href="{{ route('admin.ringkasan') }}" 
+                   class="flex items-center space-x-3 px-3 py-2 rounded-lg transition {{ request()->routeIs('admin.ringkasan') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300' }}">
+                    <i class="fa-solid fa-table-cells-large w-4 {{ request()->routeIs('admin.ringkasan') ? 'text-red-500' : 'text-slate-400' }}"></i>
+                    <span>Ringkasan</span>
+                </a>
+            </div>
+
+            <!-- MASTER DATA -->
+            <div>
+                <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">MASTER DATA</div>
                 <div class="space-y-1">
-                    <a href="{{ route('admin.ringkasan') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-table-cells-large w-4 text-slate-400"></i>
-                        <span>Ringkasan Admin</span>
+                    <a href="{{ route('admin.pengguna') }}" 
+                       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition {{ request()->routeIs('admin.pengguna') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300' }}">
+                        <i class="fa-solid fa-users w-4 {{ request()->routeIs('admin.pengguna') ? 'text-red-500' : 'text-slate-400' }}"></i>
+                        <span>Pengguna & Hak Akses</span>
                     </a>
-                    <a href="{{ route('admin.pengguna') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-users w-4 text-slate-400"></i>
-                        <span>Kelola Pengguna</span>
-                    </a>
-                    <a href="{{ route('admin.distributor') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-store w-4 text-slate-400"></i>
+                    <a href="{{ route('admin.distributor') }}" 
+                       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition {{ request()->routeIs('admin.distributor') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300' }}">
+                        <i class="fa-solid fa-store w-4 {{ request()->routeIs('admin.distributor') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Data Distributor</span>
                     </a>
-                    <a href="{{ route('admin.produk') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-cube w-4 text-slate-400"></i>
+                    <a href="{{ route('admin.produk') }}" 
+                       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition {{ request()->routeIs('admin.produk') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300' }}">
+                        <i class="fa-solid fa-cube w-4 {{ request()->routeIs('admin.produk') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Data Produk (SKU)</span>
                     </a>
-                    <a href="{{ route('admin.tahun-fiskal') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-calendar-days w-4 text-slate-400"></i>
+                    <a href="{{ route('admin.tahun-fiskal') }}" 
+                       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition {{ request()->routeIs('admin.tahun-fiskal') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300' }}">
+                        <i class="fa-solid fa-calendar-days w-4 {{ request()->routeIs('admin.tahun-fiskal') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Periode Tahun Fiskal</span>
                     </a>
-                    <a href="{{ route('admin.log-aktivitas') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
-                        <i class="fa-solid fa-file-lines w-4 text-slate-400"></i>
+                </div>
+            </div>
+
+            <!-- PENGAWASAN -->
+            <div>
+                <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">PENGAWASAN</div>
+                <div class="space-y-1">
+                    <a href="{{ route('admin.log-aktivitas') }}" 
+                       class="flex items-center space-x-3 px-3 py-2 rounded-lg transition {{ request()->routeIs('admin.log-aktivitas') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'hover:bg-slate-800 text-slate-300' }}">
+                        <i class="fa-solid fa-file-lines w-4 {{ request()->routeIs('admin.log-aktivitas') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Log Aktivitas</span>
                     </a>
                 </div>
@@ -137,7 +157,21 @@
     </div>
 
     <div class="p-4 border-t border-slate-700/60 text-xs text-slate-400">
-        <div class="text-white font-bold text-xs capitalize">{{ $currentRole }} Mode</div>
-        <div class="text-[10px] text-slate-400">Simulasi Tanpa Login</div>
+        @auth
+            <div class="text-white font-bold text-xs">{{ Auth::user()->nama }}</div>
+            <div class="text-[10px] text-slate-400 mb-2">{{ Auth::user()->peran->nama_peran ?? 'User' }}</div>
+            <button type="button"
+                    @click="showLogoutModal = true"
+                    class="flex items-center space-x-2 text-red-400 hover:text-red-300 transition mt-1 cursor-pointer w-full text-left">
+                <i class="fa-solid fa-right-from-bracket text-[11px]"></i>
+                <span class="text-[11px] font-semibold">Keluar</span>
+            </button>
+        @else
+            <div class="text-white font-bold text-xs">WAYPOINT</div>
+            <a href="{{ route('login') }}" class="text-[11px] text-red-400 hover:text-red-300 font-semibold flex items-center space-x-1.5 mt-1">
+                <i class="fa-solid fa-right-to-bracket text-[10px]"></i>
+                <span>Masuk ke Akun</span>
+            </a>
+        @endauth
     </div>
 </aside>

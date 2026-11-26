@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminPortalController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EPO\DistributorEPOController;
 use App\Http\Controllers\EPO\LogistikEPOController;
 use App\Http\Controllers\Klaim\DistributorKlaimController;
@@ -8,7 +9,14 @@ use App\Http\Controllers\Klaim\KlaimDokumenController;
 use App\Http\Controllers\Klaim\LogistikKlaimController;
 use App\Http\Controllers\Klaim\SamKlaimController;
 use App\Http\Controllers\PelaporanController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+
+// ==================== AUTENTIKASI & PROFIL ====================
+Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [LoginController::class, 'login']);
+Route::match(['get', 'post'], '/logout', [LoginController::class, 'logout'])->name('logout');
+Route::post('/profil/update', [ProfileController::class, 'update'])->name('profil.update');
 
 // Redirect otomatis dari http://localhost:8000/ ke E-PO Distributor
 Route::get('/', function () {
@@ -44,10 +52,29 @@ Route::prefix('admin')->name('admin.')->controller(AdminPortalController::class)
         return redirect()->route('admin.ringkasan');
     })->name('index');
     Route::get('/ringkasan', 'ringkasan')->name('ringkasan');
+    
+    // Pengguna & Hak Akses
     Route::get('/pengguna', 'pengguna')->name('pengguna');
+    Route::post('/pengguna', 'storePengguna')->name('pengguna.store');
+    Route::post('/pengguna/{pengguna}/toggle', 'togglePengguna')->name('pengguna.toggle');
+    Route::delete('/pengguna/{pengguna}', 'deletePengguna')->name('pengguna.delete');
+    
+    // Data Distributor
     Route::get('/distributor', 'distributor')->name('distributor');
+    Route::post('/distributor', 'storeDistributor')->name('distributor.store');
+    Route::delete('/distributor/{distributor}', 'deleteDistributor')->name('distributor.delete');
+    
+    // Data Produk (SKU)
     Route::get('/produk', 'produk')->name('produk');
+    Route::post('/produk', 'storeProduk')->name('produk.store');
+    Route::delete('/produk/{produk}', 'deleteProduk')->name('produk.delete');
+    
+    // Periode Tahun Fiskal
     Route::get('/tahun-fiskal', 'tahunFiskal')->name('tahun-fiskal');
+    Route::post('/tahun-fiskal', 'storeTahunFiskal')->name('tahun-fiskal.store');
+    Route::post('/tahun-fiskal/{tahunFiskal}/aktifkan', 'activateTahunFiskal')->name('tahun-fiskal.activate');
+    
+    // Log Aktivitas
     Route::get('/log-aktivitas', 'logAktivitas')->name('log-aktivitas');
 });
 
