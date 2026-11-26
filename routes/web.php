@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\EPO\DistributorEPOController;
 use App\Http\Controllers\EPO\LogistikEPOController;
 use App\Http\Controllers\Klaim\DistributorKlaimController;
+use App\Http\Controllers\Klaim\KlaimDokumenController;
 use App\Http\Controllers\Klaim\LogistikKlaimController;
 use App\Http\Controllers\Klaim\SamKlaimController;
 use App\Http\Controllers\PelaporanController;
@@ -113,23 +114,37 @@ Route::get('/monitoring', function () {
 
 // Modul Klaim & Retur (PJ: Farhan)
 Route::prefix('klaim')->name('klaim.')->group(function () {
+    // ---------------- BERKAS (foto bukti, tanda tangan, dokumen BAK) ----------------
+    Route::controller(KlaimDokumenController::class)->group(function () {
+        Route::get('/foto/{foto}', 'foto')->whereNumber('foto')->name('foto');
+        Route::get('/bak/{klaim}', 'bak')->whereNumber('klaim')->name('bak');
+        Route::get('/bak/{klaim}/tanda-tangan', 'tandaTangan')->whereNumber('klaim')->name('tanda-tangan');
+    });
+
     // ---------------- DISTRIBUTOR ----------------
     Route::prefix('distributor')->name('distributor.')->controller(DistributorKlaimController::class)->group(function () {
         Route::get('/beranda', 'beranda')->name('beranda')->defaults('role', 'distributor');
         Route::get('/ajukan', 'ajukan')->name('ajukan')->defaults('role', 'distributor');
+        Route::post('/ajukan', 'simpan')->name('simpan')->defaults('role', 'distributor');
         Route::get('/detail/{klaim}', 'detail')->whereNumber('klaim')->name('detail')->defaults('role', 'distributor');
     });
 
     // ---------------- SALES AREA MANAGER ----------------
     Route::prefix('sam')->name('sam.')->controller(SamKlaimController::class)->group(function () {
         Route::get('/antrean', 'antrean')->name('antrean')->defaults('role', 'sam');
+        Route::post('/jadwal/{klaim}', 'jadwalkan')->whereNumber('klaim')->name('jadwal')->defaults('role', 'sam');
         Route::get('/verifikasi/{klaim}', 'verifikasi')->whereNumber('klaim')->name('verifikasi')->defaults('role', 'sam');
+        Route::post('/verifikasi/{klaim}', 'simpanVerifikasi')->whereNumber('klaim')->name('simpan-verifikasi')->defaults('role', 'sam');
+        Route::post('/verifikasi/{klaim}/kembalikan', 'kembalikan')->whereNumber('klaim')->name('kembalikan')->defaults('role', 'sam');
         Route::get('/pengesahan/{klaim}', 'pengesahan')->whereNumber('klaim')->name('pengesahan')->defaults('role', 'sam');
+        Route::post('/pengesahan/{klaim}', 'sahkan')->whereNumber('klaim')->name('sahkan')->defaults('role', 'sam');
     });
 
     // ---------------- LOGISTIK PUSAT ----------------
     Route::prefix('logistik')->name('logistik.')->controller(LogistikKlaimController::class)->group(function () {
         Route::get('/proses', 'proses')->name('proses')->defaults('role', 'logistik');
+        Route::post('/proses/{klaim}/selesai', 'selesaikan')->whereNumber('klaim')->name('selesaikan')->defaults('role', 'logistik');
+        Route::post('/proses/{klaim}/kembalikan', 'kembalikan')->whereNumber('klaim')->name('kembalikan')->defaults('role', 'logistik');
     });
 });
 

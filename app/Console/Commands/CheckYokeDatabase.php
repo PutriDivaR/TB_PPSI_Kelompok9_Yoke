@@ -32,7 +32,8 @@ class CheckYokeDatabase extends Command
                     }
                 }
             }
-            $this->info('Terhubung ke '.DB::connection()->getDatabaseName().': 23 tabel dan 125 kolom ERD tersedia.');
+            $jumlahKolom = array_sum(array_map(fn (array $table): int => count($table['attrs']), $schema['tables']));
+            $this->info('Terhubung ke '.DB::connection()->getDatabaseName().': '.count($schema['tables']).' tabel dan '.$jumlahKolom.' kolom ERD tersedia.');
             if (DB::connection()->getDriverName() === 'mysql') {
                 $result = DB::selectOne('SELECT COUNT(*) AS jumlah FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()');
                 $this->line('Foreign key: '.$result->jumlah);

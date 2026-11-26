@@ -16,12 +16,14 @@ class DetailKlaim extends YokeModel
 
     protected $primaryKey = 'id_detail_klaim';
 
-    protected $fillable = ['id_klaim', 'id_detail_penerimaan', 'jenis_kerusakan', 'jumlah', 'penanggung_jawab', 'status_verifikasi'];
+    protected $fillable = ['id_klaim', 'id_detail_penerimaan', 'jenis_kerusakan', 'jumlah', 'penanggung_jawab', 'status_verifikasi',
+        'jumlah_terverifikasi', 'catatan_verifikasi'];
 
     protected function casts(): array
     {
         return [
             'jumlah' => 'integer',
+            'jumlah_terverifikasi' => 'integer',
         ];
     }
 

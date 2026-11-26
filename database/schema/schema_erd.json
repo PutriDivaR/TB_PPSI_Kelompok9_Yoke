@@ -900,6 +900,42 @@
           "unique": false,
           "type": "DATETIME",
           "nullable": true
+        },
+        {
+          "name": "jadwal_kunjungan",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "DATE",
+          "nullable": true
+        },
+        {
+          "name": "catatan_pengembalian",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "TEXT",
+          "nullable": true
+        },
+        {
+          "name": "bentuk_penyelesaian",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(40)",
+          "nullable": true
+        },
+        {
+          "name": "catatan_penyelesaian",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "TEXT",
+          "nullable": true
         }
       ],
       "skf": "SKF 16, SKF 17, SKF 19"
@@ -948,6 +984,15 @@
           "unique": false,
           "type": "DATETIME",
           "nullable": false
+        },
+        {
+          "name": "sumber",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(20)",
+          "nullable": true
         }
       ],
       "skf": "SKF 16"
@@ -1440,6 +1485,24 @@
           "unique": false,
           "w": false,
           "nullable": false
+        },
+        {
+          "name": "jumlah_terverifikasi",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "INT",
+          "nullable": true
+        },
+        {
+          "name": "catatan_verifikasi",
+          "w": false,
+          "pk": false,
+          "fk": null,
+          "unique": false,
+          "type": "VARCHAR(255)",
+          "nullable": true
         }
       ],
       "skf": "Rancangan berdasarkan review transkrip"

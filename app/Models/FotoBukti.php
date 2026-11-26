@@ -15,7 +15,7 @@ class FotoBukti extends YokeModel
 
     protected $primaryKey = 'id_foto';
 
-    protected $fillable = ['id_detail_klaim', 'path_berkas', 'tanggal_unggah'];
+    protected $fillable = ['id_detail_klaim', 'path_berkas', 'tanggal_unggah', 'sumber'];
 
     protected function casts(): array
     {
