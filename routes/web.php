@@ -148,12 +148,8 @@ Route::prefix('klaim')->name('klaim.')->group(function () {
     });
 });
 
-// Route Sementara Modul Pelaporan (PJ: Hasbi)
+// Shell pratinjau lokal Pelaporan; semua data/transaksi menggunakan API /api/v1/reports.
 Route::get('/pelaporan', [PelaporanController::class, 'index'])->name('pelaporan.index');
-Route::get('/pelaporan/ekspor', [PelaporanController::class, 'export'])->name('pelaporan.export');
-Route::post('/pelaporan/konteks', [PelaporanController::class, 'context'])->name('pelaporan.context');
-Route::post('/pelaporan/sell-out', [PelaporanController::class, 'storeSellOut'])->name('pelaporan.sell-out.store');
-Route::post('/pelaporan/stok', [PelaporanController::class, 'storeStock'])->name('pelaporan.stok.store');
 Route::get('/integrasi-database/status', [PelaporanController::class, 'databaseStatus'])->name('database.status');
 
 // Route Master Data Admin (Redirect ke Portal Admin)

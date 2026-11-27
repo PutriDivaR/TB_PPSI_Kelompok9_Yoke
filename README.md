@@ -142,6 +142,22 @@ Perintah installer membuat dan memeriksa skema ERD tanpa menghapus data pada dat
 - Portal Admin: `http://127.0.0.1:8001/simulasi/admin`
 - Status Database: `http://127.0.0.1:8001/integrasi-database/status`
 
+## API Modul Pelaporan
+
+Frontend modul Pelaporan menggunakan API versi 1 pada origin aplikasi yang sama. Route laporan memerlukan sesi login aktif dan role yang diizinkan. Untuk request POST, frontend mengambil token CSRF dari `GET /api/v1/auth/csrf` dan mengirim cookie sesi serta header `X-CSRF-TOKEN`.
+
+| Method dan endpoint | Fungsi |
+| --- | --- |
+| `GET /api/v1/reports/dashboard` | Ringkasan, tren bulanan, dan rekonsiliasi stok |
+| `GET /api/v1/reports/summary` | Baris laporan per distributor dan produk |
+| `GET /api/v1/reports/sell-out` | Riwayat transaksi Sell-Out (berhalaman) |
+| `GET /api/v1/reports/stock` | Riwayat snapshot stok (berhalaman) |
+| `GET /api/v1/reports/export` | Ekspor CSV dengan filter yang sama |
+| `POST /api/v1/reports/sell-out` | Catat Sell-Out; distributor diambil dari akun login |
+| `POST /api/v1/reports/stock` | Catat/perbarui snapshot stok; distributor diambil dari akun login |
+
+Endpoint riwayat menerima filter opsional `mulai`, `selesai`, `id_tahun_fiskal`, `id_distributor`, `id_produk`, `page`, dan `per_page` (1–100; default 20). Endpoint GET lainnya menerima filter periode, fiskal, distributor, dan produk yang relevan. Akun Distributor hanya dapat meminta data perusahaannya sendiri; role internal mengikuti pemeriksaan akses route. Halaman `/pelaporan` adalah pratinjau lokal yang memanggil API ini menggunakan sesi login, bukan jalur web CRUD terpisah.
+
 ## Route Utama E-PO
 
 ```text
