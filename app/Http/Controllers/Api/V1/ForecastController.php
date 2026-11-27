@@ -14,6 +14,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ForecastController extends Controller
@@ -51,19 +52,15 @@ class ForecastController extends Controller
     {
         $period = $request->validate(['periode' => ['required', 'date_format:Y-m']])['periode'];
         $periodDate = CarbonImmutable::createFromFormat('!Y-m', $period);
-        $minimumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
-            CarbonImmutable::now()->day > 15 ? 3 : 2
-        );
-        $maximumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
-            CarbonImmutable::now()->day > 15 ? 7 : 6
-        );
+        $minimumPeriod = EpoService::periodeMinimumForecast();
+        $maximumPeriod = EpoService::periodeMaximumForecast();
         if ($periodDate->lessThan($minimumPeriod) || $periodDate->greaterThan($maximumPeriod)) {
             throw ValidationException::withMessages([
                 'periode' => ['Rekomendasi hanya tersedia untuk periode '.$minimumPeriod->translatedFormat('F Y').' sampai '.$maximumPeriod->translatedFormat('F Y').' (rolling lead time 2-3 bulan).'],
             ]);
         }
         $user = $request->user();
-        abort_unless($user->id_distributor, 422, 'Akun tidak terhubung ke perusahaan Distributor.');
+        abort_unless($user->distributor?->status_aktif, 422, 'Akun tidak terhubung ke perusahaan Distributor aktif.');
 
         return response()->json(['data' => [
             'periode' => $period,
@@ -74,22 +71,18 @@ class ForecastController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->id_distributor, 422, 'Akun tidak terhubung ke perusahaan Distributor.');
+        abort_unless($user->distributor?->status_aktif, 422, 'Akun tidak terhubung ke perusahaan Distributor aktif.');
         $values = $request->validate([
             'periode' => ['required', 'date_format:Y-m'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id_produk' => ['required', 'integer', 'distinct', 'exists:produk,id_produk'],
-            'items.*.jumlah_kontainer' => ['required', 'integer', 'min:1', 'max:100000'],
+            'items.*.jumlah_kontainer' => ['required', 'integer', 'min:1', 'max:999999'],
             'submit' => ['sometimes', 'boolean'],
         ]);
         $period = CarbonImmutable::createFromFormat('!Y-m', $values['periode']);
-        $minimumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
-            CarbonImmutable::now()->day > 15 ? 3 : 2
-        );
-        $maximumPeriod = CarbonImmutable::now()->startOfMonth()->addMonthsNoOverflow(
-            CarbonImmutable::now()->day > 15 ? 7 : 6
-        );
-        if ($period->lessThan($minimumPeriod) || $period->greaterThan($maximumPeriod)) {
+        $minimumPeriod = EpoService::periodeMinimumForecast();
+        $maximumPeriod = EpoService::periodeMaximumForecast();
+        if (! EpoService::periodeForecastDiizinkan($period)) {
             throw ValidationException::withMessages([
                 'periode' => ['Forecast hanya boleh untuk periode '.$minimumPeriod->translatedFormat('F Y').' sampai '.$maximumPeriod->translatedFormat('F Y').' (rolling lead time 2-3 bulan).'],
             ]);
@@ -145,12 +138,14 @@ class ForecastController extends Controller
         $values = $request->validate([
             'items' => ['required', 'array', 'min:1'],
             'items.*.id_detail_forecast' => ['required', 'integer', 'distinct'],
-            'items.*.jumlah_disetujui' => ['required', 'integer', 'min:0', 'max:100000'],
+            'items.*.jumlah_disetujui' => ['required', 'integer', 'min:0', 'max:999999'],
+            'catatan' => ['nullable', 'string', 'max:255'],
         ]);
         /** @var Pengguna $user */
         $user = $request->user();
 
         DB::transaction(function () use ($forecast, $values, $user) {
+            EpoService::lockForecastsForPeriod($forecast->periode);
             $locked = Forecast::query()->whereKey($forecast->id_forecast)->lockForUpdate()
                 ->with('detailForecastRecords')->firstOrFail();
             if (! in_array($locked->status, ['Diajukan', 'Diproses'], true)) {
@@ -166,6 +161,21 @@ class ForecastController extends Controller
                 throw ValidationException::withMessages(['items' => ['Setidaknya satu produk harus mendapat kuota.']]);
             }
 
+            $dikurangi = false;
+            foreach ($approved as $id => $item) {
+                if ($item['jumlah_disetujui'] > (int) $details[$id]->jumlah_kontainer) {
+                    throw ValidationException::withMessages(['items' => ['Kuota disetujui tidak boleh melebihi usulan per SKU.']]);
+                }
+                $dikurangi = $dikurangi || $item['jumlah_disetujui'] < (int) $details[$id]->jumlah_kontainer;
+            }
+            $catatan = trim((string) ($values['catatan'] ?? ''));
+            if ($dikurangi && mb_strlen($catatan) < 5) {
+                throw ValidationException::withMessages(['catatan' => ['Catatan penyesuaian minimal 5 karakter wajib diisi saat kuota dikurangi.']]);
+            }
+            if ($approved->sum('jumlah_disetujui') > EpoService::sisaKapasitasForecast($locked)) {
+                throw ValidationException::withMessages(['items' => ['Total kuota melebihi sisa kapasitas pabrik untuk periode ini.']]);
+            }
+
             foreach ($approved as $id => $item) {
                 $details[$id]->update(['jumlah_disetujui' => $item['jumlah_disetujui']]);
             }
@@ -175,6 +185,9 @@ class ForecastController extends Controller
                 'id_penyetuju' => $user->id_pengguna,
             ]);
             $this->recordActivity($user, 'E-PO', 'Setujui forecast');
+            if ($catatan !== '') {
+                $this->recordActivity($user, 'E-PO', 'Catatan FC #'.$locked->id_forecast.': '.$catatan);
+            }
         });
 
         return (new ForecastResource($forecast->refresh()->load(['distributor', 'penyetuju', 'detailForecastRecords.produk'])))->response();
@@ -199,7 +212,7 @@ class ForecastController extends Controller
         LogAktivitas::query()->create([
             'id_pengguna' => $user->id_pengguna,
             'modul' => $module,
-            'aksi' => $action,
+            'aksi' => Str::limit($action, 60, ''),
             'waktu' => now(),
         ]);
     }

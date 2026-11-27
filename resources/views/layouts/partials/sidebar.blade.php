@@ -1,10 +1,15 @@
 @php
-    $currentRole = request()->route('role', request('role', session('mock_role', 'distributor')));
+    $roleName = mb_strtolower(trim(Auth::user()?->peran?->nama_peran ?? ''));
+    $currentRole = match ($roleName) {
+        'logistik pusat' => 'logistik',
+        'sales area manager' => 'sam',
+        default => $roleName,
+    };
     $roleHomeRoutes = [
-        'distributor' => 'simulation.distributor',
-        'logistik' => 'simulation.logistik',
-        'sam' => 'simulation.sam',
-        'admin' => 'simulation.admin',
+        'distributor' => 'e-po.distributor.hitung-forecast',
+        'logistik' => 'e-po.logistik.antrean',
+        'sam' => 'klaim.sam.antrean',
+        'admin' => 'admin.ringkasan',
     ];
 @endphp
 
@@ -28,7 +33,7 @@
             @if($currentRole !== 'admin')
             <div>
                 <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Utama</div>
-                <a href="{{ route($roleHomeRoutes[$currentRole] ?? 'simulation.distributor') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition">
+                <a href="{{ route($roleHomeRoutes[$currentRole] ?? 'login') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 transition">
                     <i class="fa-solid fa-chart-line w-4 text-slate-400"></i>
                     <span>Dashboard {{ ucfirst($currentRole) }}</span>
                 </a>
@@ -40,8 +45,8 @@
             <div>
                 <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Operasional Distributor</div>
                 <div class="space-y-1">
-                    <a href="{{ route('simulation.distributor') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('simulation.distributor', 'e-po.distributor.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
-                        <i class="fa-solid fa-file-invoice-dollar w-4 {{ request()->routeIs('simulation.distributor', 'e-po.distributor.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
+                    <a href="{{ route('e-po.distributor.hitung-forecast') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('e-po.distributor.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
+                        <i class="fa-solid fa-file-invoice-dollar w-4 {{ request()->routeIs('e-po.distributor.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>E-PO (Purchase Order)</span>
                     </a>
                     <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">
@@ -61,8 +66,8 @@
             <div>
                 <div class="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-2 px-2">Operasional Logistik</div>
                 <div class="space-y-1">
-                    <a href="{{ route('simulation.logistik') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('simulation.logistik', 'e-po.logistik.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
-                        <i class="fa-solid fa-check-double w-4 {{ request()->routeIs('simulation.logistik', 'e-po.logistik.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
+                    <a href="{{ route('e-po.logistik.antrean') }}" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 {{ request()->routeIs('e-po.logistik.*') ? 'bg-slate-800 text-white font-semibold border-l-4 border-red-500' : 'text-slate-300' }}">
+                        <i class="fa-solid fa-check-double w-4 {{ request()->routeIs('e-po.logistik.*') ? 'text-red-500' : 'text-slate-400' }}"></i>
                         <span>Antrean Forecast & E-PO</span>
                     </a>
                     <a href="#" class="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">

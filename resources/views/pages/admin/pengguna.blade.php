@@ -4,10 +4,10 @@
 
 @section('content')
 <div x-data="{
-    showForm: new URLSearchParams(window.location.search).get('openForm') === '1',
+    showForm: new URLSearchParams(window.location.search).get('openForm') === '1' || @json($errors->has('nama') || $errors->has('email') || $errors->has('peran') || $errors->has('kata_sandi') || $errors->has('id_distributor')),
     searchQuery: '',
     selectedRoleFilter: 'Semua',
-    selectedRole: 'Distributor'
+    selectedRole: @js(old('peran', 'Distributor'))
 }" class="space-y-6">
 
     {{-- Page Header --}}
@@ -16,7 +16,7 @@
             <div class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">MASTER DATA</div>
             <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mt-1">Pengguna & Hak Akses</h1>
             <p class="text-sm text-slate-500 font-normal mt-1">
-                Atur pendaftaran akun, pembaruan profil, penetapan peran, dan otorisasi hak akses.
+                Atur akun, hak akses, dan penggantian pemegang akun perusahaan distributor.
             </p>
         </div>
 
@@ -107,12 +107,18 @@
                         PERUSAHAAN DISTRIBUTOR TERKAIT
                     </label>
                     <select name="id_distributor"
+                            :required="selectedRole === 'Distributor'"
                             class="w-full bg-[#EBF3FB] border border-blue-100 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500">
-                        <option value="">-- Pilih Distributor (Opsional) --</option>
+                        <option value="">-- Pilih distributor --</option>
                         @foreach($distributors as $d)
-                            <option value="{{ $d->id_distributor }}">{{ $d->nama }} ({{ $d->wilayah->nama_wilayah ?? 'Area' }})</option>
+                            <option value="{{ $d->id_distributor }}"
+                                    @selected((string) old('id_distributor') === (string) $d->id_distributor)
+                                    @disabled($d->penggunaRecord !== null)>
+                                {{ $d->nama }} ({{ $d->wilayah->nama_wilayah ?? 'Area' }}){{ $d->penggunaRecord ? ' — sudah memiliki akun' : '' }}
+                            </option>
                         @endforeach
                     </select>
+                    <p class="mt-1.5 text-[11px] text-slate-500">Satu perusahaan distributor hanya dapat memiliki satu akun.</p>
                 </div>
             </div>
 
@@ -180,6 +186,11 @@
                                 'SAM' => 'bg-slate-600',
                                 default => 'bg-slate-500',
                             };
+                            $isDetachedDistributor = $roleName === 'Distributor' && $user->id_distributor === null;
+                            $isArchivedDistributor = $isDetachedDistributor && !$user->status_aktif;
+                            $statusLabel = $isArchivedDistributor
+                                ? 'Arsip'
+                                : ($isDetachedDistributor ? 'Tanpa perusahaan' : ($user->status_aktif ? 'Aktif' : 'Nonaktif'));
                         @endphp
                         <tr class="hover:bg-slate-50/80 transition-colors"
                             x-show="(selectedRoleFilter === 'Semua' || '{{ $roleName }}' === selectedRoleFilter) &&
@@ -201,34 +212,52 @@
                                 </span>
                             </td>
                             <td class="py-3 px-3">
-                                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block {{ $user->status_aktif ? 'bg-emerald-600' : 'bg-slate-700' }}">
-                                    {{ $user->status_aktif ? 'Aktif' : 'Nonaktif' }}
+                                <span class="px-2.5 py-1 rounded-md text-[11px] font-bold text-white inline-block {{ $isArchivedDistributor ? 'bg-amber-700' : ($user->status_aktif ? 'bg-emerald-600' : 'bg-slate-700') }}">
+                                    {{ $statusLabel }}
                                 </span>
+                                @if($isArchivedDistributor)
+                                    <div class="mt-1 text-[10px] text-slate-500">Riwayat dipertahankan</div>
+                                @endif
                             </td>
                             <td class="py-3 px-3 text-slate-500">{{ $user->email }}</td>
                             <td class="py-3 px-3 text-right">
                                 <div class="inline-flex items-center space-x-1.5">
-                                    {{-- Toggle Status (Power Button) --}}
-                                    <form action="{{ route('admin.pengguna.toggle', $user) }}" method="POST" class="inline">
-                                        @csrf
-                                        <button type="submit" 
-                                                title="{{ $user->status_aktif ? 'Nonaktifkan akun' : 'Aktifkan akun' }}"
-                                                class="w-7 h-7 rounded-lg {{ $user->status_aktif ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-500 hover:bg-slate-600' }} text-white flex items-center justify-center transition">
-                                            <i class="fa-solid fa-power-off text-[10px]"></i>
-                                        </button>
-                                    </form>
+                                    @if(!$isDetachedDistributor)
+                                        <a href="{{ route('admin.pengguna.edit', $user) }}"
+                                           title="{{ $roleName === 'Distributor' ? 'Edit akun atau ganti pemegang' : 'Edit akun' }}"
+                                           aria-label="Edit akun {{ $user->nama }}"
+                                           class="w-7 h-7 rounded-lg bg-sky-600 hover:bg-sky-700 text-white flex items-center justify-center transition">
+                                            <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                                        </a>
+                                    @endif
 
-                                    {{-- Delete Button --}}
-                                    <form action="{{ route('admin.pengguna.delete', $user) }}" method="POST" class="inline"
-                                          onsubmit="return confirm('Apakah Anda yakin ingin menghapus akun {{ $user->nama }}?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" 
-                                                title="Hapus akun"
-                                                class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition">
-                                            <i class="fa-solid fa-trash text-[10px]"></i>
-                                        </button>
-                                    </form>
+                                    {{-- Toggle Status (Power Button) --}}
+                                    @if(!$isArchivedDistributor)
+                                        <form action="{{ route('admin.pengguna.toggle', $user) }}" method="POST" class="inline">
+                                            @csrf
+                                            <button type="submit"
+                                                    title="{{ $user->status_aktif ? 'Nonaktifkan akun' : 'Aktifkan akun' }}"
+                                                    class="w-7 h-7 rounded-lg {{ $user->status_aktif ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-500 hover:bg-slate-600' }} text-white flex items-center justify-center transition">
+                                                <i class="fa-solid fa-power-off text-[10px]"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+
+                                    @if(!$isArchivedDistributor)
+                                        {{-- Delete Button --}}
+                                        <form action="{{ route('admin.pengguna.delete', $user) }}" method="POST" class="inline"
+                                              onsubmit="return confirm('Apakah Anda yakin ingin menghapus akun {{ $user->nama }}?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit"
+                                                    title="Hapus akun"
+                                                    class="w-7 h-7 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition">
+                                                <i class="fa-solid fa-trash text-[10px]"></i>
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span class="text-[10px] text-slate-400">Riwayat tersimpan</span>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

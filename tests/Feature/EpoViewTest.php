@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class EpoViewTest extends TestCase
@@ -19,7 +20,7 @@ class EpoViewTest extends TestCase
 @push('scripts')
     <script id="epo-test-script">window.epoTest = true;</script>
 @endpush
-BLADE);
+BLADE, ['errors' => new ViewErrorBag]);
 
         $this->assertStringContainsString('id="epo-test-script"', $html);
         $this->assertStringContainsString('window.epoTest = true;', $html);

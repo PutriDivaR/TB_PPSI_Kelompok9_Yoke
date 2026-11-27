@@ -65,16 +65,6 @@ class LoginController extends Controller
             'waktu' => now(),
         ]);
 
-        // Set mock_role session agar sidebar kompatibel
-        $roleName = strtolower($pengguna->peran->nama_peran ?? 'distributor');
-        $roleMap = [
-            'admin' => 'admin',
-            'distributor' => 'distributor',
-            'logistik pusat' => 'logistik',
-            'sam' => 'sam',
-        ];
-        session(['mock_role' => $roleMap[$roleName] ?? 'distributor']);
-
         return redirect($this->redirectByRole($pengguna));
     }
 
@@ -112,9 +102,9 @@ class LoginController extends Controller
         return match ($roleName) {
             'admin' => route('admin.ringkasan'),
             'distributor' => route('e-po.distributor.hitung-forecast'),
-            'logistik pusat' => route('simulation.logistik'),
+            'logistik pusat' => route('e-po.logistik.antrean'),
             'sam' => route('klaim.sam.antrean'),
-            default => route('e-po.distributor.hitung-forecast'),
+            default => abort(403, 'Peran akun tidak dikenali. Hubungi administrator.'),
         };
     }
 }

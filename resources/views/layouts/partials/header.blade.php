@@ -1,16 +1,10 @@
 @php
-    $currentRole = request()->route('role', request('role', session('mock_role', 'distributor')));
-    if (request()->route('role') || request()->has('role')) {
-        session(['mock_role' => $currentRole]);
-    }
-
-    $rolesInfo = [
-        'distributor' => ['name' => 'Putri Diva (Distributor)', 'desc' => 'Cabang Padang (DST-PDG-014)', 'color' => 'bg-emerald-500'],
-        'logistik'    => ['name' => 'Riski (Logistik)', 'desc' => 'Logistik Pusat Jakarta', 'color' => 'bg-blue-500'],
-        'sam'         => ['name' => 'Farhan Fitrahadi (SAM)', 'desc' => 'Sales Area Sumbar & Riau', 'color' => 'bg-amber-500'],
-        'admin'       => ['name' => 'Suci Nurhaliza (Admin)', 'desc' => 'System Administrator', 'color' => 'bg-purple-500'],
-    ];
-    $activeUser = $rolesInfo[$currentRole] ?? $rolesInfo['distributor'];
+    $roleName = mb_strtolower(trim(Auth::user()?->peran?->nama_peran ?? ''));
+    $currentRole = match ($roleName) {
+        'logistik pusat' => 'logistik',
+        'sales area manager' => 'sam',
+        default => $roleName ?: 'pengunjung',
+    };
 @endphp
 
 <header :class="sidebarOpen ? 'left-64' : 'left-0'" 
@@ -60,18 +54,7 @@
                     <i class="fa-solid fa-right-from-bracket text-xs"></i>
                 </button>
             @else
-                <div class="flex items-center space-x-3">
-                    <div class="text-right hidden sm:block">
-                        <div class="text-xs font-bold text-slate-800">{{ $activeUser['name'] }}</div>
-                        <div class="text-[10px] text-slate-400">{{ $activeUser['desc'] }}</div>
-                    </div>
-                    <img class="w-8 h-8 rounded-full border border-slate-300" 
-                         src="https://ui-avatars.com/api/?name={{ urlencode($activeUser['name']) }}&background=1E293B&color=fff" alt="Avatar">
-                    <a href="{{ route('login') }}" 
-                       class="ml-2 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-xs transition">
-                        Masuk
-                    </a>
-                </div>
+                <a href="{{ route('login') }}" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-xs transition">Masuk</a>
             @endauth
         </div>
 

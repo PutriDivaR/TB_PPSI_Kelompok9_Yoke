@@ -4,8 +4,8 @@
 
 @section('content')
 <div x-data="{
-    showForm: new URLSearchParams(window.location.search).get('openForm') === '1',
-    inputTahunMulai: 2028,
+    showForm: new URLSearchParams(window.location.search).get('openForm') === '1' || @json($errors->has('tahun_mulai')) || @json(old('tahun_mulai') !== null),
+    inputTahunMulai: @js((int) old('tahun_mulai', 2028)),
     get calculatedRentang() {
         const y = parseInt(this.inputTahunMulai) || 2028;
         return `1 Oktober ${y} – 30 September ${y + 1} (${y}/${y + 1})`;

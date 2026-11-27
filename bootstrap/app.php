@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\EnsureApiAuthenticated;
 use App\Http\Middleware\EnsureApiRole;
 use Illuminate\Foundation\Application;
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'api.auth' => EnsureApiAuthenticated::class,
+            'active' => EnsureActiveUser::class,
             'role' => EnsureApiRole::class,
         ]);
     })

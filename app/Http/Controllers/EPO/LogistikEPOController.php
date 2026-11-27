@@ -8,13 +8,12 @@ use App\Models\Forecast;
 use App\Models\LogAktivitas;
 use App\Models\Pengguna;
 use App\Models\PurchaseOrder;
+use App\Services\EpoService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  * SATUAN: karton (lihat catatan di DistributorEPOController). Kolom jumlah_kontainer /
  * jumlah_disetujui menyimpan jumlah KARTON.
  */
-class LogistikEPOController extends Controller implements HasMiddleware
+class LogistikEPOController extends Controller
 {
     public const STATUS_DRAFT = 'Draft';
 
@@ -37,13 +36,13 @@ class LogistikEPOController extends Controller implements HasMiddleware
 
     public const STATUS_DISETUJUI = 'Disetujui';
 
-    private const KARTON_PER_KONTAINER = 2000;
+    private const KARTON_PER_KONTAINER = EpoService::KARTON_PER_KONTAINER;
 
-    private const MINIMUM_ORDER_KARTON = 2000;
+    private const MINIMUM_ORDER_KARTON = EpoService::MINIMUM_ORDER_KARTON;
 
-    private const KAPASITAS_BULANAN_KARTON = 30000;
+    private const KAPASITAS_BULANAN_KARTON = EpoService::KAPASITAS_BULANAN_KARTON;
 
-    private const CUTOFF_DAY = 15;
+    private const CUTOFF_DAY = EpoService::CUTOFF_DAY;
 
     private const LEAD_TIME_MIN_DAYS = 60;
 
@@ -55,15 +54,6 @@ class LogistikEPOController extends Controller implements HasMiddleware
         'plant' => 'Plant Cikarang #02',
         'termin' => '30 Hari Kalender - Bank Transfer',
     ];
-
-    public static function middleware(): array
-    {
-        return [function (Request $request, Closure $next) {
-            abort_unless(app()->environment(['local', 'testing']), 403, 'Modul E-PO belum memakai autentikasi produksi.');
-
-            return $next($request);
-        }];
-    }
 
     // ------------------------------------------------------------------
     // LAYAR 3 - Antrean forecast & E-PO
@@ -128,10 +118,19 @@ class LogistikEPOController extends Controller implements HasMiddleware
         ]);
     }
 
-    public function mulaiForecast(Forecast $forecast): RedirectResponse
+    public function mulaiForecast(Request $request, Forecast $forecast): RedirectResponse
     {
-        abort_if($forecast->status !== self::STATUS_DIAJUKAN, 422, 'Forecast ini tidak sedang menunggu diproses.');
-        $forecast->update(['status' => self::STATUS_DIPROSES]);
+        $pengguna = $this->penggunaLogistik($request);
+        abort_unless($pengguna, 422, 'Akun Logistik Pusat tidak valid.');
+
+        DB::transaction(function () use ($forecast, $pengguna) {
+            $locked = Forecast::query()->whereKey($forecast->id_forecast)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== self::STATUS_DIAJUKAN) {
+                throw ValidationException::withMessages(['status' => 'Forecast ini tidak sedang menunggu diproses.']);
+            }
+            $locked->update(['status' => self::STATUS_DIPROSES]);
+            $this->catat($pengguna, 'Mulai proses forecast FC #'.$locked->id_forecast);
+        });
 
         return redirect()->route('e-po.logistik.detail-forecast', $forecast)->with('success', 'Forecast ditandai sedang diproses.');
     }
@@ -147,11 +146,12 @@ class LogistikEPOController extends Controller implements HasMiddleware
             'kuota.*' => ['nullable', 'integer', 'min:0', 'max:999999'],
             'catatan' => ['nullable', 'string', 'max:255'],
         ], ['kuota.*.integer' => 'Kuota harus berupa bilangan bulat (karton).', 'catatan.max' => 'Catatan maksimal 255 karakter.']);
-        $pengguna = $this->penggunaLogistik();
-        abort_unless($pengguna, 422, 'Belum ada pengguna aktif berperan Logistik Pusat.');
+        $pengguna = $this->penggunaLogistik($request);
+        abort_unless($pengguna, 422, 'Akun Logistik Pusat tidak valid.');
         $catatan = trim((string) ($nilai['catatan'] ?? ''));
 
         DB::transaction(function () use ($nilai, $forecast, $pengguna, $catatan) {
+            EpoService::lockForecastsForPeriod($forecast->periode);
             $forecast = Forecast::query()->whereKey($forecast->id_forecast)->lockForUpdate()->with('detailForecastRecords.produk')->firstOrFail();
             if (! in_array($forecast->status, [self::STATUS_DIAJUKAN, self::STATUS_DIPROSES], true)) {
                 throw ValidationException::withMessages(['kuota' => 'Forecast ini tidak lagi menunggu penetapan kuota.']);
@@ -228,10 +228,19 @@ class LogistikEPOController extends Controller implements HasMiddleware
         ]);
     }
 
-    public function mulaiEpo(PurchaseOrder $po): RedirectResponse
+    public function mulaiEpo(Request $request, PurchaseOrder $po): RedirectResponse
     {
-        abort_if($po->status !== self::STATUS_DIAJUKAN, 422, 'E-PO ini tidak sedang menunggu diproses.');
-        $po->update(['status' => self::STATUS_DIPROSES]);
+        $pengguna = $this->penggunaLogistik($request);
+        abort_unless($pengguna, 422, 'Akun Logistik Pusat tidak valid.');
+
+        DB::transaction(function () use ($po, $pengguna) {
+            $locked = PurchaseOrder::query()->whereKey($po->id_po)->lockForUpdate()->firstOrFail();
+            if ($locked->status !== self::STATUS_DIAJUKAN) {
+                throw ValidationException::withMessages(['status' => 'E-PO ini tidak sedang menunggu diproses.']);
+            }
+            $locked->update(['status' => self::STATUS_DIPROSES]);
+            $this->catat($pengguna, 'Mulai proses E-PO '.$locked->nomor_po);
+        });
 
         return redirect()->route('e-po.logistik.verifikasi-epo', $po)->with('success', 'E-PO ditandai sedang diproses.');
     }
@@ -242,10 +251,12 @@ class LogistikEPOController extends Controller implements HasMiddleware
             'konfirmasi.accepted' => 'Centang konfirmasi stok dan jadwal sebelum menyetujui.',
             'konfirmasi.required' => 'Centang konfirmasi stok dan jadwal sebelum menyetujui.',
         ]);
-        $pengguna = $this->penggunaLogistik();
-        abort_unless($pengguna, 422, 'Belum ada pengguna aktif berperan Logistik Pusat.');
+        $pengguna = $this->penggunaLogistik($request);
+        abort_unless($pengguna, 422, 'Akun Logistik Pusat tidak valid.');
 
+        $po->loadMissing('forecast');
         DB::transaction(function () use ($po, $pengguna) {
+            EpoService::lockForecastsForPeriod($po->forecast->periode);
             $po = PurchaseOrder::query()->whereKey($po->id_po)->lockForUpdate()
                 ->with(['forecast.distributor', 'forecast.detailForecastRecords', 'forecast.purchaseOrderRecords.detailPoRecordsAsPo', 'detailPoRecordsAsPo.produk'])->firstOrFail();
             if (! in_array($po->status, [self::STATUS_DIAJUKAN, self::STATUS_DIPROSES], true)) {
@@ -317,24 +328,22 @@ class LogistikEPOController extends Controller implements HasMiddleware
         return ['badge' => $this->badge(...)];
     }
 
-    private function penggunaLogistik(): ?Pengguna
+    private function penggunaLogistik(Request $request): ?Pengguna
     {
-        return Pengguna::query()->where('status_aktif', true)
-            ->whereHas('peran', fn ($q) => $q->where('nama_peran', 'Logistik Pusat'))->orderBy('id_pengguna')->first();
+        $pengguna = $request->user();
+
+        return $pengguna instanceof Pengguna && $pengguna->status_aktif ? $pengguna : null;
     }
 
     /** Total kuota (karton) yang sudah ditetapkan ke distributor lain pada sebuah periode. */
     private function kapasitasTerpakai(CarbonInterface $periode, ?int $kecualiForecast = null): int
     {
-        return (int) DetailForecast::query()->whereHas('forecast', function ($query) use ($periode, $kecualiForecast) {
-            $query->whereDate('periode', $periode->toDateString())->where('status', self::STATUS_DISETUJUI)
-                ->when($kecualiForecast, fn ($q) => $q->where('id_forecast', '!=', $kecualiForecast));
-        })->sum('jumlah_disetujui');
+        return EpoService::kapasitasTerpakai($periode, $kecualiForecast);
     }
 
     private function sisaKapasitas(Forecast $forecast): int
     {
-        return max(0, self::KAPASITAS_BULANAN_KARTON - $this->kapasitasTerpakai($forecast->periode, $forecast->id_forecast));
+        return EpoService::sisaKapasitasForecast($forecast);
     }
 
     /** @return list<array{label: string, lolos: bool}> */

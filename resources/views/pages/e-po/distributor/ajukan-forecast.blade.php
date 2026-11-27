@@ -15,15 +15,6 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-4">
-            <form method="POST" action="{{ route('e-po.distributor.konteks') }}" class="flex items-center gap-2">
-                @csrf
-                <label for="ctx-distributor" class="text-[10px] font-bold uppercase text-slate-400">Perusahaan simulasi</label>
-                <select id="ctx-distributor" name="id_distributor" onchange="this.form.submit()" class="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white">
-                    @foreach ($daftarDistributor as $d)
-                        <option value="{{ $d->id_distributor }}" @selected($d->id_distributor === $distributor->id_distributor)>{{ $d->nama }}</option>
-                    @endforeach
-                </select>
-            </form>
             @php $langkah = ['Usulan Forecast', 'Input E-PO', 'Dokumen PO Selesai']; $aktif = 1; @endphp
             <ol class="flex items-center gap-2 text-xs">
                 @foreach ($langkah as $i => $label)

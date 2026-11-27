@@ -39,9 +39,6 @@
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
 
-    <!-- Admin Portal Mock Store -->
-    <script src="{{ asset('js/admin-portal.js') }}"></script>
-
     <style>
         [x-cloak] { display: none !important; }
         body { font-family: 'Inter', sans-serif; }

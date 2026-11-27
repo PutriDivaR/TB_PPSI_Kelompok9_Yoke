@@ -242,7 +242,10 @@ class PelaporanDatabaseTest extends TestCase
 
     public function test_preview_page_loads_as_a_client_of_the_reporting_api(): void
     {
-        $this->get('/pelaporan')->assertOk()
+        $company = Distributor::factory()->create();
+        $user = $this->penggunaDistributor($company);
+
+        $this->actingAs($user)->get('/pelaporan')->assertOk()
             ->assertSee('/api/v1/reports/dashboard')
             ->assertSee('/api/v1/reports/sell-out')
             ->assertSee('/api/v1/reports/stock')
@@ -312,8 +315,10 @@ class PelaporanDatabaseTest extends TestCase
 
     public function test_production_environment_cannot_use_simulated_write_access(): void
     {
+        $company = Distributor::factory()->create();
+        $user = $this->penggunaDistributor($company);
         $this->app->instance('env', 'production');
-        $this->get('/pelaporan')->assertForbidden();
+        $this->actingAs($user)->get('/pelaporan')->assertForbidden();
     }
 
     public function test_report_uses_received_good_stock_and_latest_snapshot(): void

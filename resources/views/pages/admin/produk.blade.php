@@ -4,7 +4,7 @@
 
 @section('content')
 <div x-data="{
-    showForm: new URLSearchParams(window.location.search).get('openForm') === '1',
+    showForm: new URLSearchParams(window.location.search).get('openForm') === '1' || @json($errors->has('kode_sku') || $errors->has('nama_produk') || $errors->has('harga') || $errors->has('karton_per_kontainer') || $errors->has('kategori')),
     formData: {
         harga: 150000,
         isi: 2000

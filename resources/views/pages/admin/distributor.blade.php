@@ -4,9 +4,9 @@
 
 @section('content')
 <div x-data="{
-    showForm: new URLSearchParams(window.location.search).get('openForm') === '1',
+    showForm: new URLSearchParams(window.location.search).get('openForm') === '1' || @json($errors->has('nama') || $errors->has('kontak') || $errors->has('telepon') || $errors->has('wilayah')),
     selectedWilayahFilter: 'Semua',
-    selectedWilayah: 'Sumbar'
+    selectedWilayah: @js(old('wilayah', 'Sumbar'))
 }" class="space-y-6">
 
     {{-- Page Header --}}
