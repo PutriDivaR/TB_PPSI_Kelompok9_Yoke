@@ -14,17 +14,48 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class MonitoringPengirimanController extends Controller implements HasMiddleware
 {
     public static function middleware(): array
     {
-        return [function (Request $request, Closure $next) {
-            abort_unless(app()->environment(['local', 'testing']), 403, 'Modul Monitoring belum memakai autentikasi produksi.');
+        return [];
+    }
 
-            return $next($request);
-        }];
+    /**
+     * Tentukan peran pengguna:
+     * 1. Jika pengguna telah login, ambil dari peran akun di database.
+     * 2. Jika tidak, gunakan peran simulasi dari request/session.
+     */
+    private function resolveRole(Request $request, string $default = 'distributor'): string
+    {
+        if (Auth::check()) {
+            $roleName = mb_strtolower(trim(Auth::user()->peran?->nama_peran ?? ''));
+
+            return match ($roleName) {
+                'logistik pusat' => 'logistik',
+                'sales area manager' => 'sam',
+                default => $roleName ?: $default,
+            };
+        }
+
+        return $request->route('role', $request->input('role', session('mock_role', $default)));
+    }
+
+    /**
+     * Tentukan ID distributor aktif:
+     * 1. Jika akun distributor login memiliki id_distributor, gunakan id tersebut.
+     * 2. Jika tidak, gunakan id default 1.
+     */
+    private function resolveDistributorId(): int
+    {
+        if (Auth::check() && Auth::user()->id_distributor) {
+            return (int) Auth::user()->id_distributor;
+        }
+
+        return (int) session('active_distributor_id', 1);
     }
 
     /**
@@ -33,8 +64,9 @@ class MonitoringPengirimanController extends Controller implements HasMiddleware
      */
     public function index(Request $request): View
     {
-        $currentRole = $request->route('role', $request->input('role', session('mock_role', 'distributor')));
+        $currentRole = $this->resolveRole($request, 'distributor');
         session(['mock_role' => $currentRole]);
+        $distributorId = $this->resolveDistributorId();
 
         // Filter dari request
         $filterDistributor = $request->input('distributor');
@@ -49,10 +81,10 @@ class MonitoringPengirimanController extends Controller implements HasMiddleware
         ]);
 
         // Filter berdasarkan peran
-        // Jika Distributor, default hanya melihat pengiriman miliknya (PT Minang Niaga Jaya / ID 1)
+        // Jika Distributor, default hanya melihat pengiriman miliknya
         if ($currentRole === 'distributor') {
-            $query->whereHas('po.forecast', function ($q) {
-                $q->where('id_distributor', 1);
+            $query->whereHas('po.forecast', function ($q) use ($distributorId) {
+                $q->where('id_distributor', $distributorId);
             });
         } elseif ($filterDistributor && $filterDistributor !== 'semua') {
             $query->whereHas('po.forecast', function ($q) use ($filterDistributor) {
@@ -189,7 +221,7 @@ class MonitoringPengirimanController extends Controller implements HasMiddleware
      */
     public function detail(Request $request, $id): View
     {
-        $currentRole = $request->route('role', $request->input('role', session('mock_role', 'distributor')));
+        $currentRole = $this->resolveRole($request, 'distributor');
 
         $shipment = Pengiriman::with([
             'po.forecast.distributor.wilayah',
@@ -214,7 +246,7 @@ class MonitoringPengirimanController extends Controller implements HasMiddleware
      */
     public function updateStatus(Request $request, $id): View
     {
-        $currentRole = $request->route('role', $request->input('role', session('mock_role', 'logistik')));
+        $currentRole = $this->resolveRole($request, 'logistik');
 
         $shipment = Pengiriman::with([
             'po.forecast.distributor.wilayah',
@@ -292,7 +324,7 @@ class MonitoringPengirimanController extends Controller implements HasMiddleware
      */
     public function konfirmasi(Request $request, $id): View
     {
-        $currentRole = $request->route('role', $request->input('role', session('mock_role', 'distributor')));
+        $currentRole = $this->resolveRole($request, 'distributor');
 
         $shipment = Pengiriman::with([
             'po.forecast.distributor.wilayah',
