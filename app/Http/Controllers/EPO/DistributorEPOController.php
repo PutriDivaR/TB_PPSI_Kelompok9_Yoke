@@ -11,16 +11,13 @@ use App\Models\LogAktivitas;
 use App\Models\Pengguna;
 use App\Models\Produk;
 use App\Models\PurchaseOrder;
-use App\Models\SellOut;
-use App\Models\StokGudang;
 use App\Models\TahunFiskal;
+use App\Services\EpoService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -34,7 +31,7 @@ use Illuminate\Validation\ValidationException;
  * detail_po.jumlah_kontainer menyimpan jumlah KARTON (nama kolom lama dari ERD).
  * Estimasi kontainer hanya dihitung untuk tampilan: total karton / KARTON_PER_KONTAINER.
  */
-class DistributorEPOController extends Controller implements HasMiddleware
+class DistributorEPOController extends Controller
 {
     public const STATUS_DRAFT = 'Draft';
 
@@ -45,25 +42,19 @@ class DistributorEPOController extends Controller implements HasMiddleware
     public const STATUS_DISETUJUI = 'Disetujui';
 
     /** Isi 1 kontainer (karton). Dipakai untuk "Estimasi Kontainer". */
-    private const KARTON_PER_KONTAINER = 2000;
+    private const KARTON_PER_KONTAINER = EpoService::KARTON_PER_KONTAINER;
 
     /** Minimum total pesanan 1 E-PO (karton) = 1 kontainer. Ubah di sini bila aturan berubah. */
-    private const MINIMUM_ORDER_KARTON = 2000;
+    private const MINIMUM_ORDER_KARTON = EpoService::MINIMUM_ORDER_KARTON;
 
     /** Kapasitas produksi pabrik per bulan (karton). */
-    private const KAPASITAS_BULANAN_KARTON = 30000;
+    private const KAPASITAS_BULANAN_KARTON = EpoService::KAPASITAS_BULANAN_KARTON;
 
-    private const LEAD_TIME_MIN_MONTHS = 2;
+    private const ROLLING_PLANNING_MAX_MONTHS = EpoService::ROLLING_PLANNING_MAX_MONTHS;
 
-    private const LEAD_TIME_MAX_MONTHS = 3;
+    private const CUTOFF_DAY = EpoService::CUTOFF_DAY;
 
-    private const ROLLING_PLANNING_MAX_MONTHS = 7;
-
-    private const CUTOFF_DAY = 15;
-
-    private const BULAN_RIWAYAT_PENJUALAN = 3;
-
-    private const STOK_PENGAMAN = 0.10;
+    private const BULAN_RIWAYAT_PENJUALAN = EpoService::BULAN_RIWAYAT_PENJUALAN;
 
     private const LEAD_TIME_MIN_DAYS = 60;
 
@@ -77,15 +68,6 @@ class DistributorEPOController extends Controller implements HasMiddleware
         'plant' => 'Plant Cikarang #02',
         'termin' => '30 Hari Kalender - Bank Transfer',
     ];
-
-    public static function middleware(): array
-    {
-        return [function (Request $request, Closure $next) {
-            abort_unless(app()->environment(['local', 'testing']), 403, 'Modul E-PO belum memakai autentikasi produksi.');
-
-            return $next($request);
-        }];
-    }
 
     // ------------------------------------------------------------------
     // LAYAR 1 - Hitung Forecast (beranda distributor)
@@ -475,35 +457,25 @@ class DistributorEPOController extends Controller implements HasMiddleware
         ]);
     }
 
-    public function ubahKonteks(Request $request): RedirectResponse
-    {
-        $nilai = $request->validate(['id_distributor' => ['required', 'integer', 'exists:distributor,id_distributor']]);
-        $request->session()->put('active_distributor_id', (int) $nilai['id_distributor']);
-
-        return redirect()->route('e-po.distributor.hitung-forecast')->with('success', 'Perusahaan simulasi aktif diperbarui.');
-    }
-
     // ------------------------------------------------------------------
     // Helper privat
     // ------------------------------------------------------------------
     private function distributorAktif(Request $request): ?Distributor
     {
-        $dipilih = $request->session()->get('active_distributor_id');
+        $pengguna = $request->user();
+        if (! $pengguna instanceof Pengguna || ! $pengguna->distributor?->status_aktif) {
+            return null;
+        }
 
-        return Distributor::query()->with('wilayah', 'penggunaRecord')->where('status_aktif', true)
-            ->when($dipilih, fn ($q) => $q->whereKey($dipilih))->first()
-            ?? Distributor::query()->with('wilayah', 'penggunaRecord')->where('status_aktif', true)->orderBy('id_distributor')->first();
+        return $pengguna->distributor->loadMissing('wilayah', 'penggunaRecord');
     }
 
-    /** @return array{distributor: Distributor, daftarDistributor: Collection}|null */
+    /** @return array{distributor: Distributor}|null */
     private function konteksDistributor(Request $request): ?array
     {
         $distributor = $this->distributorAktif($request);
 
-        return $distributor ? [
-            'distributor' => $distributor,
-            'daftarDistributor' => Distributor::query()->where('status_aktif', true)->orderBy('nama')->get(['id_distributor', 'nama']),
-        ] : null;
+        return $distributor ? ['distributor' => $distributor] : null;
     }
 
     /** Closure pembantu untuk Blade: $badge($status, 'forecast'|'po'). Tanggal memakai $tanggalEpo dari AppServiceProvider. */
@@ -554,41 +526,24 @@ class DistributorEPOController extends Controller implements HasMiddleware
 
     private function tenggatPengajuan(CarbonImmutable $periode): CarbonImmutable
     {
-        $bulanCutoff = $periode->subMonthsNoOverflow(self::LEAD_TIME_MIN_MONTHS)->startOfMonth();
+        $bulanCutoff = $periode->subMonthsNoOverflow(EpoService::LEAD_TIME_MIN_MONTHS)->startOfMonth();
 
         return $bulanCutoff->setDay(min(self::CUTOFF_DAY, $bulanCutoff->daysInMonth))->setTime(17, 0);
     }
 
     private function periodeMinimumForecast(): CarbonImmutable
     {
-        $bulanMinimum = CarbonImmutable::now()->startOfMonth()
-            ->addMonthsNoOverflow(self::LEAD_TIME_MIN_MONTHS);
-
-        if (CarbonImmutable::now()->day > self::CUTOFF_DAY) {
-            $bulanMinimum = $bulanMinimum->addMonthNoOverflow();
-        }
-
-        return $bulanMinimum;
+        return EpoService::periodeMinimumForecast();
     }
 
     private function periodeMaximumForecast(): CarbonImmutable
     {
-        return CarbonImmutable::now()->startOfMonth()
-            ->addMonthsNoOverflow(
-                CarbonImmutable::now()->day > self::CUTOFF_DAY
-                    ? self::ROLLING_PLANNING_MAX_MONTHS
-                    : self::ROLLING_PLANNING_MAX_MONTHS - 1
-            );
+        return EpoService::periodeMaximumForecast();
     }
 
     private function periodeMaximumEpo(): CarbonImmutable
     {
-        return CarbonImmutable::now()->startOfMonth()
-            ->addMonthsNoOverflow(
-                CarbonImmutable::now()->day > self::CUTOFF_DAY
-                    ? self::LEAD_TIME_MAX_MONTHS + 1
-                    : self::LEAD_TIME_MAX_MONTHS
-            );
+        return EpoService::periodeMaximumEpo();
     }
 
     private function tahunFiskalUntuk(CarbonInterface $tanggal): ?TahunFiskal
@@ -605,36 +560,12 @@ class DistributorEPOController extends Controller implements HasMiddleware
      */
     private function rekomendasi(int $idDistributor, CarbonImmutable $periodeTarget): Collection
     {
-        $bulanMusiman = $periodeTarget->subYearNoOverflow();
-        $mulai = $bulanMusiman->startOfMonth()->subMonthsNoOverflow(self::BULAN_RIWAYAT_PENJUALAN - 1);
-        $akhir = $bulanMusiman->endOfMonth();
-
-        $penjualan = SellOut::query()->where('id_distributor', $idDistributor)
-            ->whereDate('tanggal', '>=', $mulai->toDateString())->whereDate('tanggal', '<=', $akhir->toDateString())
-            ->get(['id_produk', 'tanggal', 'jumlah'])
-            ->groupBy('id_produk')
-            ->map(fn (Collection $baris) => $baris->groupBy(fn ($b) => CarbonImmutable::parse($b->tanggal)->format('Y-m'))
-                ->map(fn (Collection $perBulan) => (float) $perBulan->sum('jumlah')));
-        $stok = StokGudang::query()->where('id_distributor', $idDistributor)->whereDate('periode', '<=', $akhir->toDateString())
-            ->orderByDesc('periode')->get()->unique('id_produk')->keyBy('id_produk');
-
-        $bobotTotal = 0;
-        $bobot = [];
-        for ($i = 0; $i < self::BULAN_RIWAYAT_PENJUALAN; $i++) {
-            $bobot[$mulai->addMonthsNoOverflow($i)->format('Y-m')] = $i + 1;
-            $bobotTotal += $i + 1;
-        }
-
-        return Produk::query()->orderBy('kode_sku')->get()->mapWithKeys(function (Produk $produk) use ($penjualan, $stok, $bobot, $bobotTotal) {
-            $bulanan = $penjualan[$produk->id_produk] ?? collect();
-            $rataRata = collect($bobot)->sum(fn (int $b, string $bulan) => ((float) ($bulanan[$bulan] ?? 0)) * $b) / $bobotTotal;
-            $stokLayak = (int) ($stok[$produk->id_produk]->stok_layak_jual ?? 0);
-
-            return [$produk->id_produk => [
-                'rata_rata' => round($rataRata, 1), 'stok_layak_jual' => $stokLayak,
-                'karton' => (int) ceil(max(0.0, $rataRata * (1 + self::STOK_PENGAMAN) - $stokLayak)),
-            ]];
-        });
+        return collect(EpoService::hitungRekomendasi($idDistributor, $periodeTarget->format('Y-m')))
+            ->mapWithKeys(fn (array $item) => [$item['id_produk'] => [
+                'rata_rata' => $item['rata_rata_sell_out'],
+                'stok_layak_jual' => $item['stok_layak_jual'],
+                'karton' => $item['rekomendasi'],
+            ]]);
     }
 
     /**

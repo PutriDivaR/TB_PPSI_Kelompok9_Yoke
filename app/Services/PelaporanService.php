@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 class PelaporanService
 {
     /** @return Collection<int, array<string,mixed>> */
-    public function summary(string $start, string $end, ?int $distributorId): Collection
+    public function summary(string $start, string $end, ?int $distributorId, ?int $productId = null): Collection
     {
         $endTime = CarbonImmutable::parse($end)->endOfDay()->toDateTimeString();
         $distributors = Distributor::query()->when($distributorId, fn ($q) => $q->whereKey($distributorId))->with('wilayah')->get()->keyBy('id_distributor');
@@ -25,6 +25,7 @@ class PelaporanService
             ->join('purchase_order as po', 'po.id_po', '=', 'g.id_po')
             ->join('forecast as f', 'f.id_forecast', '=', 'po.id_forecast')
             ->whereIn('f.id_distributor', $ids)->whereDate('si.tanggal', '>=', $start)->whereDate('si.tanggal', '<=', $end)
+            ->when($productId, fn ($query) => $query->where('dp.id_produk', $productId))
             ->selectRaw('f.id_distributor, dp.id_produk, SUM(si.jumlah) AS jumlah')
             ->groupBy('f.id_distributor', 'dp.id_produk')->get();
         $receipts = DB::table('detail_penerimaan as dt')
@@ -35,11 +36,14 @@ class PelaporanService
             ->join('purchase_order as po', 'po.id_po', '=', 'g.id_po')
             ->join('forecast as f', 'f.id_forecast', '=', 'po.id_forecast')
             ->whereIn('f.id_distributor', $ids)->where('pb.tanggal_terima', '<=', $endTime)
+            ->when($productId, fn ($query) => $query->where('dp.id_produk', $productId))
             ->selectRaw('f.id_distributor, dp.id_produk, DATE(pb.tanggal_terima) AS tanggal, SUM(dt.jumlah_baik) AS jumlah')
             ->groupByRaw('f.id_distributor, dp.id_produk, DATE(pb.tanggal_terima)')->get();
-        $sellOut = SellOut::query()->whereIn('id_distributor', $ids)->whereDate('tanggal', '<=', $end)->get();
-        $stocks = StokGudang::query()->whereIn('id_distributor', $ids)->whereDate('periode', '<=', $end)->orderByDesc('periode')->get();
-        $products = Produk::query()->get()->keyBy('id_produk');
+        $sellOut = SellOut::query()->whereIn('id_distributor', $ids)->whereDate('tanggal', '<=', $end)
+            ->when($productId, fn ($query) => $query->where('id_produk', $productId))->get();
+        $stocks = StokGudang::query()->whereIn('id_distributor', $ids)->whereDate('periode', '<=', $end)
+            ->when($productId, fn ($query) => $query->where('id_produk', $productId))->orderByDesc('periode')->get();
+        $products = Produk::query()->when($productId, fn ($query) => $query->whereKey($productId))->get()->keyBy('id_produk');
         $key = fn ($record) => $record->id_distributor.':'.$record->id_produk;
         $keys = $sellIn->concat($receipts)->concat($sellOut)->concat($stocks)->map($key)->unique();
 

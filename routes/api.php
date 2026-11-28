@@ -107,6 +107,8 @@ Route::middleware('web')->prefix('v1')->name('api.v1.')->group(function (): void
         Route::prefix('reports')->name('reports.')->middleware('role:admin,distributor,logistik pusat,sam')->group(function (): void {
             Route::get('/dashboard', [ReportingController::class, 'dashboard'])->name('dashboard');
             Route::get('/summary', [ReportingController::class, 'summary'])->name('summary');
+            Route::get('/sell-out', [ReportingController::class, 'sellOutHistory'])->name('sell-out.index');
+            Route::get('/stock', [ReportingController::class, 'stockHistory'])->name('stock.index');
             Route::get('/export', [ReportingController::class, 'export'])->name('export');
             Route::post('/sell-out', [ReportingController::class, 'storeSellOut'])
                 ->middleware('role:distributor')->name('sell-out.store');

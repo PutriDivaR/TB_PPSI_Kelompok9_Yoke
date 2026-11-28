@@ -34,6 +34,10 @@ class KlaimAlurTest extends TestCase
 
     private Pengguna $penggunaDistributor;
 
+    private Pengguna $penggunaSam;
+
+    private Pengguna $penggunaLogistik;
+
     private PenerimaanBarang $penerimaan;
 
     /** Baris penerimaan dengan 40 karton tidak layak jual. */
@@ -57,8 +61,8 @@ class KlaimAlurTest extends TestCase
         $this->penggunaDistributor = Pengguna::factory()->create([
             'id_peran' => Peran::factory()->create(['nama_peran' => 'Distributor'])->id_peran, 'id_distributor' => $this->distributor->id_distributor,
         ]);
-        Pengguna::factory()->create(['nama' => 'SAM Uji', 'id_peran' => Peran::factory()->create(['nama_peran' => 'SAM'])->id_peran]);
-        Pengguna::factory()->create(['id_peran' => Peran::factory()->create(['nama_peran' => 'Logistik Pusat'])->id_peran]);
+        $this->penggunaSam = Pengguna::factory()->create(['nama' => 'SAM Uji', 'id_peran' => Peran::factory()->create(['nama_peran' => 'SAM'])->id_peran]);
+        $this->penggunaLogistik = Pengguna::factory()->create(['id_peran' => Peran::factory()->create(['nama_peran' => 'Logistik Pusat'])->id_peran]);
 
         $this->penerimaan = $this->buatKedatangan($this->distributor, 'UJIU 1234567');
         [$this->barisRusak, $this->barisKurang] = $this->penerimaan->detailPenerimaanRecordsAsPenerimaan()->orderBy('id_detail_penerimaan')->get()->all();
@@ -84,38 +88,38 @@ class KlaimAlurTest extends TestCase
         $this->assertSame('Perusahaan', $rusak->penanggung_jawab);
         Storage::disk('local')->assertExists(FotoBukti::query()->sole()->path_berkas);
 
-        $this->post(route('klaim.sam.jadwal', $klaim), ['jadwal_kunjungan' => '2026-11-24'])->assertSessionHasNoErrors();
-        $this->get(route('klaim.sam.antrean'))->assertOk()->assertViewHas('stats', fn (array $stats) => $stats['kunjungan_hari_ini'] === 1);
+        $this->actingAs($this->penggunaSam)->post(route('klaim.sam.jadwal', $klaim), ['jadwal_kunjungan' => '2026-11-24'])->assertSessionHasNoErrors();
+        $this->actingAs($this->penggunaSam)->get(route('klaim.sam.antrean'))->assertOk()->assertViewHas('stats', fn (array $stats) => $stats['kunjungan_hari_ini'] === 1);
 
         $this->verifikasi($klaim, $rusak, $kurang)->assertRedirect(route('klaim.sam.pengesahan', $klaim));
         $this->assertSame([40, 15], [$rusak->fresh()->jumlah_terverifikasi, $kurang->fresh()->jumlah_terverifikasi]);
         $this->assertSame('SAM', FotoBukti::query()->latest('id_foto')->first()->sumber);
 
-        $this->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => $this->tandaTangan()])->assertRedirect(route('klaim.sam.antrean'));
+        $this->actingAs($this->penggunaSam)->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => $this->tandaTangan()])->assertRedirect(route('klaim.sam.antrean'));
         $bak = BeritaAcaraKerusakan::query()->sole();
         $this->assertSame('BAK-00001', $bak->nomor_bak);
         $this->assertSame(KlaimService::STATUS_DI_LOGISTIK, $klaim->fresh()->status);
 
         // Logistik mengembalikan ke SAM; pengesahan ulang memperbarui BAK yang sama.
-        $this->post(route('klaim.logistik.kembalikan', $klaim), ['catatan' => 'Foto lokasi kurang jelas.'])->assertSessionHasNoErrors();
+        $this->actingAs($this->penggunaLogistik)->post(route('klaim.logistik.kembalikan', $klaim), ['catatan' => 'Foto lokasi kurang jelas.'])->assertSessionHasNoErrors();
         $this->assertSame(KlaimService::STATUS_MENUNGGU_SAM, $klaim->fresh()->status);
         $this->assertSame(KlaimService::BAK_DIBATALKAN, $bak->fresh()->status);
         $this->assertSame(KlaimService::VERIFIKASI_MENUNGGU, $rusak->fresh()->status_verifikasi);
-        $this->get(route('klaim.sam.pengesahan', $klaim))->assertRedirect(route('klaim.sam.verifikasi', $klaim));
+        $this->actingAs($this->penggunaSam)->get(route('klaim.sam.pengesahan', $klaim))->assertRedirect(route('klaim.sam.verifikasi', $klaim));
 
         $this->verifikasi($klaim, $rusak, $kurang);
-        $this->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => $this->tandaTangan()])->assertSessionHasNoErrors();
+        $this->actingAs($this->penggunaSam)->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => $this->tandaTangan()])->assertSessionHasNoErrors();
         $this->assertSame(1, BeritaAcaraKerusakan::query()->count());
         $this->assertSame(['BAK-00001', KlaimService::BAK_DISAHKAN], [$bak->fresh()->nomor_bak, $bak->fresh()->status]);
 
-        $this->post(route('klaim.logistik.selesaikan', $klaim), ['bentuk_penyelesaian' => 'Ganti Rugi', 'catatan' => 'Dibayar bersama tagihan.'])
+        $this->actingAs($this->penggunaLogistik)->post(route('klaim.logistik.selesaikan', $klaim), ['bentuk_penyelesaian' => 'Ganti Rugi', 'catatan' => 'Dibayar bersama tagihan.'])
             ->assertRedirect(route('klaim.logistik.proses'));
         $klaim->refresh();
         $this->assertSame([KlaimService::STATUS_SELESAI, 'Ganti Rugi'], [$klaim->status, $klaim->bentuk_penyelesaian]);
         $this->assertNotNull($klaim->tanggal_penyelesaian);
 
         $this->sebagaiDistributor()->get(route('klaim.distributor.detail', $klaim))->assertOk()->assertSee('BAK-00001')->assertSee('Ganti Rugi');
-        $this->get(route('klaim.bak', $klaim))->assertOk()->assertSee('SAM Uji')->assertSee('UJIU 1234567');
+        $this->actingAs($this->penggunaSam)->get(route('klaim.bak', $klaim))->assertOk()->assertSee('SAM Uji')->assertSee('UJIU 1234567');
     }
 
     public function test_returned_claim_can_be_corrected_and_resubmitted_for_the_same_arrival(): void
@@ -126,7 +130,7 @@ class KlaimAlurTest extends TestCase
         $klaim = Klaim::query()->sole();
         $fotoLama = FotoBukti::query()->sole()->path_berkas;
 
-        $this->post(route('klaim.sam.kembalikan', $klaim), ['catatan' => 'Jumlah tidak sesuai foto.'])->assertRedirect(route('klaim.sam.antrean'));
+        $this->actingAs($this->penggunaSam)->post(route('klaim.sam.kembalikan', $klaim), ['catatan' => 'Jumlah tidak sesuai foto.'])->assertRedirect(route('klaim.sam.antrean'));
         $this->assertSame(KlaimService::STATUS_DIKEMBALIKAN, $klaim->fresh()->status);
         $this->sebagaiDistributor()->get(route('klaim.distributor.ajukan'))->assertOk()->assertSee('(perlu diperbaiki)');
 
@@ -169,9 +173,13 @@ class KlaimAlurTest extends TestCase
         ]));
         $klaim = Klaim::query()->sole();
         $lain = Distributor::factory()->create(['id_wilayah' => $this->distributor->id_wilayah]);
+        $penggunaLain = Pengguna::factory()->create([
+            'id_peran' => Peran::factory()->create(['nama_peran' => 'Distributor'])->id_peran,
+            'id_distributor' => $lain->id_distributor,
+        ]);
 
-        $this->withSession(['active_distributor_id' => $lain->id_distributor])->get(route('klaim.distributor.detail', $klaim))->assertNotFound();
-        $this->withSession(['active_distributor_id' => $lain->id_distributor])->post(route('klaim.distributor.simpan'), $this->formKlaim([
+        $this->actingAs($penggunaLain)->get(route('klaim.distributor.detail', $klaim))->assertNotFound();
+        $this->actingAs($penggunaLain)->post(route('klaim.distributor.simpan'), $this->formKlaim([
             ['id_detail_penerimaan' => $this->barisRusak->id_detail_penerimaan, 'jenis_kerusakan' => 'Penyok', 'jumlah' => 5],
         ]))->assertForbidden();
     }
@@ -183,8 +191,8 @@ class KlaimAlurTest extends TestCase
         ]));
         $klaim = Klaim::query()->sole();
 
-        $this->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => $this->tandaTangan()])->assertSessionHasErrors('tanda_tangan');
-        $this->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => 'data:image/png;base64,'.base64_encode('bukan gambar')])->assertSessionHasErrors('tanda_tangan');
+        $this->actingAs($this->penggunaSam)->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => $this->tandaTangan()])->assertSessionHasErrors('tanda_tangan');
+        $this->actingAs($this->penggunaSam)->post(route('klaim.sam.sahkan', $klaim), ['tanda_tangan' => 'data:image/png;base64,'.base64_encode('bukan gambar')])->assertSessionHasErrors('tanda_tangan');
         $this->assertSame(0, BeritaAcaraKerusakan::query()->count());
     }
 
@@ -205,7 +213,7 @@ class KlaimAlurTest extends TestCase
 
     private function sebagaiDistributor(): static
     {
-        return $this->withSession(['active_distributor_id' => $this->distributor->id_distributor]);
+        return $this->actingAs($this->penggunaDistributor);
     }
 
     /** @param  list<array<string, mixed>>  $baris */
@@ -216,7 +224,7 @@ class KlaimAlurTest extends TestCase
 
     private function verifikasi(Klaim $klaim, DetailKlaim $sesuai, DetailKlaim $tidakSesuai)
     {
-        return $this->post(route('klaim.sam.simpan-verifikasi', $klaim), [
+        return $this->actingAs($this->penggunaSam)->post(route('klaim.sam.simpan-verifikasi', $klaim), [
             'hasil' => [
                 $sesuai->id_detail_klaim => ['status_verifikasi' => 'Disetujui'],
                 $tidakSesuai->id_detail_klaim => ['status_verifikasi' => 'Ditolak', 'jumlah_terverifikasi' => 15, 'catatan' => '5 karton ditemukan di palet lain.'],

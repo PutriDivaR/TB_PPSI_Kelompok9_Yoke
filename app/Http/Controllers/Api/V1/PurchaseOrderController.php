@@ -9,6 +9,7 @@ use App\Models\Forecast;
 use App\Models\LogAktivitas;
 use App\Models\Pengguna;
 use App\Models\PurchaseOrder;
+use App\Services\EpoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,29 +52,40 @@ class PurchaseOrderController extends Controller
             'id_forecast' => ['required', 'integer', 'exists:forecast,id_forecast'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.id_produk' => ['required', 'integer', 'distinct', 'exists:produk,id_produk'],
-            'items.*.jumlah_kontainer' => ['required', 'integer', 'min:1', 'max:100000'],
+            'items.*.jumlah_kontainer' => ['required', 'integer', 'min:1', 'max:999999'],
             'submit' => ['sometimes', 'boolean'],
         ]);
         $user = $request->user();
+        $kirim = (bool) ($values['submit'] ?? false);
+        if ($kirim && collect($values['items'])->sum('jumlah_kontainer') < EpoService::MINIMUM_ORDER_KARTON) {
+            throw ValidationException::withMessages([
+                'items' => ['Minimum order '.number_format(EpoService::MINIMUM_ORDER_KARTON, 0, ',', '.').' karton.'],
+            ]);
+        }
 
-        $order = DB::transaction(function () use ($values, $user) {
+        $order = DB::transaction(function () use ($values, $user, $kirim) {
             $forecast = Forecast::query()->whereKey($values['id_forecast'])->lockForUpdate()
                 ->with('detailForecastRecords')->firstOrFail();
-            abort_unless((int) $forecast->id_distributor === (int) $user->id_distributor || $user->peran->nama_peran !== 'Distributor',
+            abort_unless((int) $forecast->id_distributor === (int) $user->id_distributor && $user->distributor?->status_aktif,
                 403, 'Forecast bukan milik perusahaan Anda.');
             if ($forecast->status !== 'Disetujui') {
                 throw ValidationException::withMessages(['id_forecast' => ['PO hanya dapat dibuat dari forecast yang sudah disetujui.']]);
             }
-            if ($forecast->purchaseOrderRecords()->where('status', '!=', 'Draft')->exists()) {
-                throw ValidationException::withMessages(['id_forecast' => ['Forecast ini sudah memiliki PO yang diajukan.']]);
+            if (! EpoService::periodeEpoDiizinkan($forecast->periode)) {
+                throw ValidationException::withMessages(['id_forecast' => ['Forecast ini berada di luar window pengajuan E-PO.']]);
             }
 
             $forecastItems = $forecast->detailForecastRecords->keyBy('id_produk');
+            $terpakai = DetailPo::query()->whereHas('po', fn ($query) => $query
+                ->where('id_forecast', $forecast->id_forecast)
+                ->whereIn('status', ['Diajukan', 'Diproses', 'Disetujui']))
+                ->get()->groupBy('id_produk')->map(fn ($lines) => (int) $lines->sum('jumlah_kontainer'));
             foreach ($values['items'] as $item) {
                 $forecastItem = $forecastItems->get($item['id_produk']);
                 abort_unless($forecastItem, 422, 'Produk PO harus tercantum dalam forecast.');
-                if ($item['jumlah_kontainer'] > (int) $forecastItem->jumlah_disetujui) {
-                    throw ValidationException::withMessages(['items' => ['Jumlah PO tidak boleh melebihi kuota produk yang disetujui.']]);
+                $sisa = max(0, (int) $forecastItem->jumlah_disetujui - (int) ($terpakai[$item['id_produk']] ?? 0));
+                if ($item['jumlah_kontainer'] > $sisa) {
+                    throw ValidationException::withMessages(['items' => ['Jumlah PO tidak boleh melebihi sisa kuota produk yang disetujui.']]);
                 }
             }
 
@@ -89,7 +101,7 @@ class PurchaseOrderController extends Controller
             }
             $order->fill([
                 'tanggal_pengajuan' => now(),
-                'status' => ($values['submit'] ?? false) ? 'Diajukan' : 'Draft',
+                'status' => $kirim ? 'Diajukan' : 'Draft',
             ])->save();
             DetailPo::query()->where('id_po', $order->id_po)->delete();
             foreach ($values['items'] as $item) {
@@ -100,7 +112,7 @@ class PurchaseOrderController extends Controller
                 ]);
             }
 
-            $this->recordActivity($user, 'E-PO', ($values['submit'] ?? false) ? 'Ajukan PO' : 'Simpan draft PO');
+            $this->recordActivity($user, 'E-PO', $kirim ? 'Ajukan PO' : 'Simpan draft PO');
 
             return $order;
         });
@@ -112,15 +124,38 @@ class PurchaseOrderController extends Controller
     public function approve(Request $request, PurchaseOrder $purchaseOrder): JsonResponse
     {
         $user = $request->user();
-        DB::transaction(function () use ($purchaseOrder, $user) {
-            $order = PurchaseOrder::query()->whereKey($purchaseOrder->id_po)->lockForUpdate()->with('forecast')->firstOrFail();
-            if ($order->status !== 'Diajukan' || $order->forecast->status !== 'Disetujui') {
+        $forecast = Forecast::query()->findOrFail($purchaseOrder->id_forecast);
+        DB::transaction(function () use ($purchaseOrder, $forecast, $user) {
+            EpoService::lockForecastsForPeriod($forecast->periode);
+            $forecast = Forecast::query()->whereKey($forecast->id_forecast)->lockForUpdate()
+                ->with(['distributor', 'detailForecastRecords'])->firstOrFail();
+            $order = PurchaseOrder::query()->whereKey($purchaseOrder->id_po)->lockForUpdate()
+                ->with('detailPoRecordsAsPo')->firstOrFail();
+            if ((int) $order->id_forecast !== (int) $forecast->id_forecast
+                || $order->status !== 'Diajukan'
+                || $forecast->status !== 'Disetujui') {
                 throw ValidationException::withMessages(['status' => ['PO ini belum memenuhi status untuk disetujui.']]);
             }
-            $approvedQuantities = $order->forecast->detailForecastRecords()->pluck('jumlah_disetujui', 'id_produk');
+            if (! $forecast->distributor->status_aktif || ! filled($forecast->distributor->nomor_mou)) {
+                throw ValidationException::withMessages(['status' => ['Distributor harus aktif dan memiliki nomor MoU.']]);
+            }
+            if (! EpoService::periodeEpoDiizinkan($forecast->periode)) {
+                throw ValidationException::withMessages(['status' => ['Forecast ini berada di luar window pemrosesan E-PO.']]);
+            }
+
+            $approvedQuantities = $forecast->detailForecastRecords->pluck('jumlah_disetujui', 'id_produk');
+            $terpakai = DetailPo::query()->whereHas('po', fn ($query) => $query
+                ->where('id_forecast', $forecast->id_forecast)
+                ->where('id_po', '!=', $order->id_po)
+                ->whereIn('status', ['Diajukan', 'Diproses', 'Disetujui']))
+                ->get()->groupBy('id_produk')->map(fn ($lines) => (int) $lines->sum('jumlah_kontainer'));
+            if ($order->detailPoRecordsAsPo->sum('jumlah_kontainer') < EpoService::MINIMUM_ORDER_KARTON) {
+                throw ValidationException::withMessages(['items' => ['Total PO belum memenuhi minimum order.']]);
+            }
             foreach ($order->detailPoRecordsAsPo as $line) {
-                if ($line->jumlah_kontainer > (int) $approvedQuantities->get($line->id_produk, 0)) {
-                    throw ValidationException::withMessages(['items' => ['Jumlah PO melebihi kuota forecast yang disetujui.']]);
+                $sisa = max(0, (int) $approvedQuantities->get($line->id_produk, 0) - (int) ($terpakai[$line->id_produk] ?? 0));
+                if ($line->jumlah_kontainer > $sisa) {
+                    throw ValidationException::withMessages(['items' => ['Jumlah PO melebihi sisa kuota forecast yang disetujui.']]);
                 }
             }
             $order->update([

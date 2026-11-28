@@ -8,6 +8,7 @@ use App\Models\DetailPenerimaan;
 use App\Models\Distributor;
 use App\Models\Klaim;
 use App\Models\PenerimaanBarang;
+use App\Models\Pengguna;
 use App\Models\TahunFiskal;
 use App\Services\KlaimService;
 use Closure;
@@ -248,13 +249,13 @@ class DistributorKlaimController extends Controller implements HasMiddleware
         return PenerimaanBarang::query()->whereHas('pengiriman.po.forecast', fn ($forecast) => $forecast->where('id_distributor', $distributor->id_distributor));
     }
 
-    /** Sama dengan modul E-PO: distributor simulasi dipilih lewat session active_distributor_id. */
     private function distributorAktif(Request $request): ?Distributor
     {
-        $dipilih = $request->session()->get('active_distributor_id');
+        $pengguna = $request->user();
+        if (! $pengguna instanceof Pengguna || ! $pengguna->distributor?->status_aktif) {
+            return null;
+        }
 
-        return Distributor::query()->with('wilayah', 'penggunaRecord')->where('status_aktif', true)
-            ->when($dipilih, fn ($query) => $query->whereKey($dipilih))->first()
-            ?? Distributor::query()->with('wilayah', 'penggunaRecord')->where('status_aktif', true)->orderBy('id_distributor')->first();
+        return $pengguna->distributor->loadMissing('wilayah', 'penggunaRecord');
     }
 }

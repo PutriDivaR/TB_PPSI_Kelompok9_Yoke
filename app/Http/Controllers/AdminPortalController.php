@@ -2,29 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Distributor;
+use App\Models\LogAktivitas;
+use App\Models\Pengguna;
+use App\Models\Peran;
+use App\Models\Produk;
+use App\Models\TahunFiskal;
+use App\Models\Wilayah;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+
 class AdminPortalController extends Controller
 {
     /**
-     * Data Master Pengguna Awal
+     * Matriks hak akses per peran (statis, sesuai desain sistem).
      */
-    public static function getInitialUsers(): array
-    {
-        return [
-            ['id' => 1, 'nama' => 'Rina Wulandari', 'email' => 'rina.w@contoh.id', 'peran' => 'Admin', 'status' => 'Aktif', 'login_terakhir' => '23 Okt 2026, 09:12', 'inisial' => 'RW'],
-            ['id' => 2, 'nama' => 'Fajar Hidayat', 'email' => 'fajar.h@contoh.id', 'peran' => 'Distributor', 'status' => 'Aktif', 'login_terakhir' => '22 Okt 2026, 16:40', 'inisial' => 'FH'],
-            ['id' => 3, 'nama' => 'Maya Sartika', 'email' => 'maya.s@contoh.id', 'peran' => 'Logistik Pusat', 'status' => 'Aktif', 'login_terakhir' => '23 Okt 2026, 08:05', 'inisial' => 'MS'],
-            ['id' => 4, 'nama' => 'Dedi Kurniawan', 'email' => 'dedi.k@contoh.id', 'peran' => 'SAM', 'status' => 'Aktif', 'login_terakhir' => '21 Okt 2026, 14:22', 'inisial' => 'DK'],
-            ['id' => 5, 'nama' => 'Yoga Prasetyo', 'email' => 'yoga.p@contoh.id', 'peran' => 'Distributor', 'status' => 'Nonaktif', 'login_terakhir' => '02 Okt 2026, 10:30', 'inisial' => 'YP'],
-            ['id' => 6, 'nama' => 'Lina Marlina', 'email' => 'lina.m@contoh.id', 'peran' => 'SAM', 'status' => 'Aktif', 'login_terakhir' => '22 Okt 2026, 11:18', 'inisial' => 'LM'],
-            ['id' => 7, 'nama' => 'Budi Santoso', 'email' => 'budi.s@contoh.id', 'peran' => 'Logistik Pusat', 'status' => 'Aktif', 'login_terakhir' => '20 Okt 2026, 15:47', 'inisial' => 'BS'],
-            ['id' => 8, 'nama' => 'Ahmad Zulfikar', 'email' => 'ahmad.z@contoh.id', 'peran' => 'Distributor', 'status' => 'Aktif', 'login_terakhir' => '19 Okt 2026, 09:02', 'inisial' => 'AZ'],
-        ];
-    }
-
-    /**
-     * Data Matriks Hak Akses Awal
-     */
-    public static function getInitialPermissions(): array
+    private static function getPermissionsMatrix(): array
     {
         return [
             ['modul' => 'Kelola Pengguna', 'admin' => true, 'distributor' => false, 'logistik' => false, 'sam' => false],
@@ -37,109 +34,483 @@ class AdminPortalController extends Controller
         ];
     }
 
-    /**
-     * Data Master Distributor Awal
-     */
-    public static function getInitialDistributors(): array
+    private function logAction(string $modul, string $aksi): void
     {
-        return [
-            ['id' => 1, 'kode' => 'DST-001', 'nama' => 'PT Minang Niaga Perkasa', 'wilayah' => 'Sumbar', 'kontak' => 'Hendra Putra', 'telepon' => '0751-000-101'],
-            ['id' => 2, 'kode' => 'DST-002', 'nama' => 'CV Ranah Bundo Sejahtera', 'wilayah' => 'Sumbar', 'kontak' => 'Rosa Anggraini', 'telepon' => '0752-000-102'],
-            ['id' => 3, 'kode' => 'DST-003', 'nama' => 'PT Andalas Mitra Distribusi', 'wilayah' => 'Sumbar', 'kontak' => 'Irfan Maulana', 'telepon' => '0751-000-103'],
-            ['id' => 4, 'kode' => 'DST-004', 'nama' => 'PT Riau Makmur Lestari', 'wilayah' => 'Riau', 'kontak' => 'Tania Rahmawati', 'telepon' => '0761-000-104'],
-            ['id' => 5, 'kode' => 'DST-005', 'nama' => 'CV Bumi Lancang Kuning', 'wilayah' => 'Riau', 'kontak' => 'Rudi Hartono', 'telepon' => '0761-000-105'],
-            ['id' => 6, 'kode' => 'DST-006', 'nama' => 'PT Pekanbaru Jaya Abadi', 'wilayah' => 'Riau', 'kontak' => 'Sari Wulansari', 'telepon' => '0761-000-106'],
-        ];
-    }
+        $userId = Auth::id();
+        abort_unless($userId, 403, 'Sesi administrator tidak ditemukan.');
 
-    /**
-     * Data Master Produk (SKU) Awal
-     */
-    public static function getInitialProducts(): array
-    {
-        return [
-            ['id' => 1, 'kode' => 'SKU-001', 'nama' => 'Produk Contoh A', 'harga' => 185000, 'isi' => 2000, 'nilai' => 370000000],
-            ['id' => 2, 'kode' => 'SKU-002', 'nama' => 'Produk Contoh B', 'harga' => 210000, 'isi' => 2000, 'nilai' => 420000000],
-            ['id' => 3, 'kode' => 'SKU-003', 'nama' => 'Produk Contoh C', 'harga' => 95000,  'isi' => 2000, 'nilai' => 190000000],
-        ];
-    }
-
-    /**
-     * Data Master Periode Tahun Fiskal Awal
-     */
-    public static function getInitialFiscalPeriods(): array
-    {
-        return [
-            ['id' => 1, 'tahun' => '2027/2028', 'rentang' => '1 Oktober 2027 – 30 September 2028', 'status' => 'Draf'],
-            ['id' => 2, 'tahun' => '2026/2027', 'rentang' => '1 Oktober 2026 – 30 September 2027', 'status' => 'Aktif'],
-            ['id' => 3, 'tahun' => '2025/2026', 'rentang' => '1 Oktober 2025 – 30 September 2026', 'status' => 'Selesai'],
-            ['id' => 4, 'tahun' => '2024/2025', 'rentang' => '1 Oktober 2024 – 30 September 2025', 'status' => 'Selesai'],
-        ];
-    }
-
-    /**
-     * Data Log Aktivitas Awal
-     */
-    public static function getInitialLogs(): array
-    {
-        return [
-            ['id' => 1, 'waktu' => '23 Okt 2026 · 09:41', 'pengguna' => 'Rina Wulandari', 'peran' => 'Admin', 'aksi' => 'Ubah', 'modul' => 'Kelola Pengguna', 'keterangan' => 'Mengubah peran Dedi Kurniawan menjadi SAM', 'ip' => '10.12.4.21'],
-            ['id' => 2, 'waktu' => '23 Okt 2026 · 09:28', 'pengguna' => 'Rina Wulandari', 'peran' => 'Admin', 'aksi' => 'Tambah', 'modul' => 'Master Distributor', 'keterangan' => 'Menambahkan CV Bumi Lancang Kuning (Riau)', 'ip' => '10.12.4.21'],
-            ['id' => 3, 'waktu' => '23 Okt 2026 · 09:12', 'pengguna' => 'Rina Wulandari', 'peran' => 'Admin', 'aksi' => 'Login', 'modul' => 'Autentikasi', 'keterangan' => 'Masuk ke sistem', 'ip' => '10.12.4.21'],
-            ['id' => 4, 'waktu' => '23 Okt 2026 · 08:05', 'pengguna' => 'Maya Sartika', 'peran' => 'Logistik Pusat', 'aksi' => 'Login', 'modul' => 'Autentikasi', 'keterangan' => 'Masuk ke sistem', 'ip' => '10.12.7.54'],
-            ['id' => 5, 'waktu' => '22 Okt 2026 · 16:40', 'pengguna' => 'Fajar Hidayat', 'peran' => 'Distributor', 'aksi' => 'Login', 'modul' => 'Autentikasi', 'keterangan' => 'Masuk ke sistem', 'ip' => '36.88.20.145'],
-            ['id' => 6, 'waktu' => '22 Okt 2026 · 15:10', 'pengguna' => 'Rina Wulandari', 'peran' => 'Admin', 'aksi' => 'Ubah', 'modul' => 'Master Produk (SKU)', 'keterangan' => 'Memperbarui harga SKU-002', 'ip' => '10.12.4.21'],
-            ['id' => 7, 'waktu' => '22 Okt 2026 · 11:32', 'pengguna' => 'Rina Wulandari', 'peran' => 'Admin', 'aksi' => 'Ekspor', 'modul' => 'Log Aktivitas', 'keterangan' => 'Mengekspor log 1–21 Okt 2026', 'ip' => '10.12.4.21'],
-            ['id' => 8, 'waktu' => '21 Okt 2026 · 14:22', 'pengguna' => 'Dedi Kurniawan', 'peran' => 'SAM', 'aksi' => 'Login', 'modul' => 'Autentikasi', 'keterangan' => 'Masuk ke sistem', 'ip' => '10.12.9.12'],
-            ['id' => 9, 'waktu' => '20 Okt 2026 · 10:03', 'pengguna' => 'Rina Wulandari', 'peran' => 'Admin', 'aksi' => 'Hapus', 'modul' => 'Kelola Pengguna', 'keterangan' => 'Menghapus akun uji coba', 'ip' => '10.12.4.21'],
-            ['id' => 10, 'waktu' => '01 Okt 2026 · 00:05', 'pengguna' => 'Rina Wulandari', 'peran' => 'Admin', 'aksi' => 'Ubah', 'modul' => 'Tahun Fiskal', 'keterangan' => 'Mengaktifkan periode 2026/2027', 'ip' => '10.12.4.21'],
-        ];
+        LogAktivitas::create([
+            'id_pengguna' => $userId,
+            'modul' => $modul,
+            'aksi' => $aksi,
+            'waktu' => now(),
+        ]);
     }
 
     public function ringkasan()
     {
-        return view('pages.admin.ringkasan', [
-            'initialUsers' => self::getInitialUsers(),
-            'initialDistributors' => self::getInitialDistributors(),
-            'initialProducts' => self::getInitialProducts(),
-            'initialFiscalPeriods' => self::getInitialFiscalPeriods(),
-            'initialLogs' => self::getInitialLogs(),
-        ]);
+        $users = Pengguna::with('peran')->get();
+        $distributors = Distributor::with('wilayah')->get();
+        $products = Produk::all();
+        $fiscalPeriods = TahunFiskal::orderBy('tanggal_mulai', 'desc')->get();
+        $logs = LogAktivitas::with('pengguna.peran')
+            ->orderBy('waktu', 'desc')
+            ->limit(10)
+            ->get();
+
+        return view('pages.admin.ringkasan', compact(
+            'users',
+            'distributors',
+            'products',
+            'fiscalPeriods',
+            'logs'
+        ));
     }
+
+    // ==================== 1. PENGGUNA & HAK AKSES ====================
 
     public function pengguna()
     {
-        return view('pages.admin.pengguna', [
-            'initialUsers' => self::getInitialUsers(),
-            'initialPermissions' => self::getInitialPermissions(),
-        ]);
+        $users = Pengguna::with(['peran', 'distributor'])->get();
+        $roles = Peran::all();
+        $distributors = Distributor::with('penggunaRecord')->get();
+        $permissions = self::getPermissionsMatrix();
+
+        return view('pages.admin.pengguna', compact('users', 'roles', 'distributors', 'permissions'));
     }
+
+    public function storePengguna(Request $request)
+    {
+        $nilai = $request->validate([
+            'nama' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:254', 'unique:pengguna,email'],
+            'peran' => ['required', Rule::in(['Admin', 'Distributor', 'Logistik Pusat', 'SAM'])],
+            'kata_sandi' => ['nullable', 'string', 'min:4'],
+            'id_distributor' => [
+                'exclude_unless:peran,Distributor',
+                'required',
+                'integer',
+                'exists:distributor,id_distributor',
+                Rule::unique('pengguna', 'id_distributor'),
+            ],
+        ], [
+            'nama.required' => 'Nama lengkap wajib diisi.',
+            'email.required' => 'Alamat email wajib diisi.',
+            'email.unique' => 'Alamat email sudah terdaftar.',
+            'peran.required' => 'Peran pengguna wajib dipilih.',
+            'peran.in' => 'Pilih peran yang tersedia.',
+            'id_distributor.required' => 'Pilih perusahaan distributor untuk akun dengan peran Distributor.',
+            'id_distributor.exists' => 'Perusahaan distributor yang dipilih tidak ditemukan.',
+            'id_distributor.unique' => 'Perusahaan distributor ini sudah memiliki akun. Setiap perusahaan hanya dapat memiliki satu akun distributor.',
+        ]);
+
+        $pengguna = DB::transaction(function () use ($nilai) {
+            $peran = Peran::firstOrCreate(
+                ['nama_peran' => $nilai['peran']],
+                ['deskripsi' => 'Peran '.$nilai['peran']]
+            );
+
+            $pengguna = Pengguna::create([
+                'nama' => $nilai['nama'],
+                'email' => $nilai['email'],
+                'kata_sandi' => Hash::make($nilai['kata_sandi'] ?? 'password123'),
+                'id_peran' => $peran->id_peran,
+                'status_aktif' => true,
+                'id_distributor' => $nilai['id_distributor'] ?? null,
+            ]);
+
+            $this->logAction('Kelola Pengguna', 'Tambah');
+
+            return $pengguna->load('peran');
+        });
+
+        return redirect()->route('admin.pengguna')
+            ->with('success', "Pengguna baru '{$pengguna->nama}' ({$pengguna->peran->nama_peran}) berhasil ditambahkan.");
+    }
+
+    public function editPengguna(Pengguna $pengguna)
+    {
+        if ($this->isDetachedDistributorAccount($pengguna)) {
+            return redirect()->route('admin.pengguna')
+                ->with('error', 'Akun distributor lama yang sudah dilepas dari perusahaan merupakan arsip dan tidak dapat diedit.');
+        }
+
+        $pengguna->loadMissing(['peran', 'distributor']);
+        $isDistributor = $this->isDistributorAccount($pengguna);
+
+        return view('pages.admin.edit-pengguna', compact('pengguna', 'isDistributor'));
+    }
+
+    public function updatePengguna(Request $request, Pengguna $pengguna)
+    {
+        $mode = $request->input('mode', 'edit');
+        if (
+            $this->isDetachedDistributorAccount($pengguna)
+            || ($mode === 'ganti_pemegang' && ! $this->isDistributorAccount($pengguna))
+        ) {
+            return redirect()->route('admin.pengguna')
+                ->with('error', 'Akun ini tidak dapat diperbarui dengan pilihan tersebut.');
+        }
+
+        $emailRule = Rule::unique('pengguna', 'email');
+        if ($mode === 'edit') {
+            $emailRule->ignore($pengguna->id_pengguna, 'id_pengguna');
+        }
+
+        $nilai = $request->validate([
+            'mode' => ['required', Rule::in(['edit', 'ganti_pemegang'])],
+            'nama' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:254', $emailRule],
+            'kata_sandi' => [
+                'exclude_unless:mode,ganti_pemegang',
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+            ],
+        ], [
+            'nama.required' => 'Nama lengkap wajib diisi.',
+            'email.required' => 'Alamat email wajib diisi.',
+            'email.unique' => 'Alamat email sudah digunakan akun lain.',
+            'kata_sandi.required' => 'Kata sandi pemegang baru wajib diisi.',
+            'kata_sandi.min' => 'Kata sandi pemegang baru minimal 8 karakter.',
+            'kata_sandi.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
+        ]);
+
+        $hasil = DB::transaction(function () use ($nilai, $pengguna) {
+            $akunLama = Pengguna::query()
+                ->with(['peran', 'distributor'])
+                ->lockForUpdate()
+                ->findOrFail($pengguna->id_pengguna);
+
+            if (
+                $this->isDetachedDistributorAccount($akunLama)
+                || ($nilai['mode'] === 'ganti_pemegang' && ! $this->isDistributorAccount($akunLama))
+            ) {
+                return null;
+            }
+
+            if ($nilai['mode'] === 'ganti_pemegang') {
+                $distributorId = $akunLama->id_distributor;
+                $namaLama = $akunLama->nama;
+                $namaDistributor = $akunLama->distributor->nama;
+
+                $akunLama->update([
+                    'status_aktif' => false,
+                    'id_distributor' => null,
+                ]);
+
+                $akunBaru = Pengguna::create([
+                    'nama' => $nilai['nama'],
+                    'email' => $nilai['email'],
+                    'kata_sandi' => Hash::make($nilai['kata_sandi']),
+                    'id_peran' => $akunLama->id_peran,
+                    'status_aktif' => true,
+                    'id_distributor' => $distributorId,
+                ]);
+
+                $this->logAction('Kelola Pengguna', 'Ganti Akun');
+
+                return [
+                    'mode' => 'ganti_pemegang',
+                    'namaLama' => $namaLama,
+                    'namaBaru' => $akunBaru->nama,
+                    'namaDistributor' => $namaDistributor,
+                ];
+            }
+
+            $akunLama->update([
+                'nama' => $nilai['nama'],
+                'email' => $nilai['email'],
+            ]);
+            $this->logAction('Kelola Pengguna', 'Ubah');
+
+            return ['mode' => 'edit', 'nama' => $akunLama->nama];
+        });
+
+        if ($hasil === null) {
+            return redirect()->route('admin.pengguna')
+                ->with('error', 'Akun sudah berubah. Muat ulang halaman sebelum mencoba lagi.');
+        }
+
+        if ($hasil['mode'] === 'ganti_pemegang') {
+            return redirect()->route('admin.pengguna')->with(
+                'success',
+                "Akun '{$hasil['namaLama']}' diarsipkan. Akun '{$hasil['namaBaru']}' kini terhubung ke {$hasil['namaDistributor']}; riwayat lama tetap atas nama pemegang sebelumnya."
+            );
+        }
+
+        return redirect()->route('admin.pengguna')
+            ->with('success', "Profil akun '{$hasil['nama']}' berhasil diperbarui.");
+    }
+
+    public function togglePengguna(Pengguna $pengguna)
+    {
+        $pengguna->loadMissing('peran');
+        $newStatus = ! $pengguna->status_aktif;
+        if ($newStatus && $this->isDetachedDistributorAccount($pengguna)) {
+            return redirect()->back()
+                ->with('error', 'Akun distributor yang sudah diarsipkan tidak dapat diaktifkan kembali. Buat akun baru untuk pemegang berikutnya.');
+        }
+
+        if (! $newStatus && (int) Auth::id() === (int) $pengguna->id_pengguna) {
+            return redirect()->back()->with('error', 'Anda tidak dapat menonaktifkan akun administrator yang sedang digunakan.');
+        }
+
+        DB::transaction(function () use ($pengguna, $newStatus) {
+            $pengguna->update(['status_aktif' => $newStatus]);
+            $this->logAction('Kelola Pengguna', 'Ubah');
+        });
+
+        $statusLabel = $newStatus ? 'diaktifkan' : 'dinonaktifkan';
+
+        return redirect()->back()
+            ->with('success', "Status akun '{$pengguna->nama}' berhasil {$statusLabel}.");
+    }
+
+    public function deletePengguna(Pengguna $pengguna)
+    {
+        if ((int) Auth::id() === (int) $pengguna->id_pengguna) {
+            return redirect()->back()->with('error', 'Anda tidak dapat menghapus akun Anda sendiri.');
+        }
+
+        if ($this->isDetachedDistributorAccount($pengguna)) {
+            return redirect()->back()
+                ->with('error', 'Akun distributor arsip dipertahankan agar riwayat pemegang sebelumnya tetap utuh.');
+        }
+
+        if (
+            $pengguna->logAktivitasRecords()->exists()
+            || $pengguna->forecastRecordsAsPenyetuju()->exists()
+            || $pengguna->purchaseOrderRecordsAsPenyetuju()->exists()
+            || $pengguna->beritaAcaraKerusakanRecordsAsPengesah()->exists()
+        ) {
+            return redirect()->back()->with('error', "Akun '{$pengguna->nama}' sudah tercatat dalam riwayat aktivitas atau transaksi. Nonaktifkan akun agar riwayat tetap utuh.");
+        }
+
+        $nama = $pengguna->nama;
+        DB::transaction(function () use ($pengguna) {
+            $pengguna->delete();
+            $this->logAction('Kelola Pengguna', 'Hapus');
+        });
+
+        return redirect()->back()->with('success', "Akun '{$nama}' berhasil dihapus.");
+    }
+
+    private function isDistributorAccount(Pengguna $pengguna): bool
+    {
+        $pengguna->loadMissing('peran');
+
+        return $pengguna->id_distributor !== null
+            && $pengguna->peran?->nama_peran === 'Distributor';
+    }
+
+    private function isDetachedDistributorAccount(Pengguna $pengguna): bool
+    {
+        $pengguna->loadMissing('peran');
+
+        return $pengguna->id_distributor === null
+            && $pengguna->peran?->nama_peran === 'Distributor';
+    }
+
+    // ==================== 2. MASTER DISTRIBUTOR ====================
 
     public function distributor()
     {
-        return view('pages.admin.distributor', [
-            'initialDistributors' => self::getInitialDistributors(),
-        ]);
+        $distributors = Distributor::with('wilayah')->get();
+        $wilayahList = Wilayah::all();
+
+        return view('pages.admin.distributor', compact('distributors', 'wilayahList'));
     }
+
+    public function storeDistributor(Request $request)
+    {
+        $nilai = $request->validate([
+            'nama' => ['required', 'string', 'max:150'],
+            'kontak' => ['required', 'string', 'max:60'],
+            'telepon' => ['nullable', 'string', 'max:60'],
+            'wilayah' => ['required', 'string', Rule::in(['Sumbar', 'Riau'])],
+        ], [
+            'nama.required' => 'Nama perusahaan distributor wajib diisi.',
+            'kontak.required' => 'Nama kontak resmi wajib diisi.',
+            'wilayah.required' => 'Cakupan wilayah wajib dipilih.',
+            'wilayah.in' => 'Pilih cakupan wilayah yang tersedia.',
+        ]);
+
+        $namaWilayah = match (strtolower(trim($nilai['wilayah']))) {
+            'sumbar', 'sumatera barat' => 'Sumatera Barat',
+            'riau' => 'Riau',
+            default => $nilai['wilayah'],
+        };
+
+        $distributor = DB::transaction(function () use ($nilai, $namaWilayah) {
+            $wilayah = Wilayah::firstOrCreate(['nama_wilayah' => $namaWilayah]);
+
+            $distributor = Distributor::create([
+                'nama' => $nilai['nama'],
+                'id_wilayah' => $wilayah->id_wilayah,
+                'kontak' => $nilai['kontak'].(! empty($nilai['telepon'] ?? null) ? ' ('.$nilai['telepon'].')' : ''),
+                'status_aktif' => true,
+            ]);
+
+            $this->logAction('Master Distributor', 'Tambah');
+
+            return $distributor;
+        });
+
+        return redirect()->route('admin.distributor')
+            ->with('success', "Distributor baru '{$distributor->nama}' berhasil didaftarkan.");
+    }
+
+    public function deleteDistributor(Distributor $distributor)
+    {
+        if (
+            $distributor->penggunaRecord()->exists()
+            || $distributor->forecastRecords()->exists()
+            || $distributor->sellOutRecords()->exists()
+            || $distributor->stokGudangRecords()->exists()
+        ) {
+            return redirect()->back()->with('error', "Distributor '{$distributor->nama}' masih digunakan oleh akun atau data operasional. Nonaktifkan, bukan hapus, agar riwayat tetap utuh.");
+        }
+
+        $nama = $distributor->nama;
+        DB::transaction(function () use ($distributor) {
+            $distributor->delete();
+            $this->logAction('Master Distributor', 'Hapus');
+        });
+
+        return redirect()->back()->with('success', "Data distributor '{$nama}' berhasil dihapus.");
+    }
+
+    // ==================== 3. MASTER PRODUK (SKU) ====================
 
     public function produk()
     {
-        return view('pages.admin.produk', [
-            'initialProducts' => self::getInitialProducts(),
-        ]);
+        $products = Produk::all();
+
+        return view('pages.admin.produk', compact('products'));
     }
+
+    public function storeProduk(Request $request)
+    {
+        $nilai = $request->validate([
+            'kode_sku' => ['required', 'string', 'max:60', 'unique:produk,kode_sku'],
+            'nama_produk' => ['required', 'string', 'max:150'],
+            'harga' => ['required', 'numeric', 'min:0'],
+            'karton_per_kontainer' => ['required', 'integer', 'min:1'],
+            'kategori' => ['nullable', 'string', 'max:40'],
+        ], [
+            'kode_sku.required' => 'Kode SKU wajib diisi.',
+            'kode_sku.unique' => 'Kode SKU sudah terdaftar.',
+            'nama_produk.required' => 'Nama produk wajib diisi.',
+            'harga.required' => 'Harga per karton wajib diisi.',
+            'karton_per_kontainer.required' => 'Isi karton per kontainer wajib diisi.',
+        ]);
+
+        $produk = DB::transaction(function () use ($nilai) {
+            $produk = Produk::create([
+                'kode_sku' => strtoupper(trim($nilai['kode_sku'])),
+                'nama_produk' => $nilai['nama_produk'],
+                'harga' => $nilai['harga'],
+                'karton_per_kontainer' => $nilai['karton_per_kontainer'],
+                'kategori' => $nilai['kategori'] ?? 'Minuman',
+            ]);
+
+            $this->logAction('Master Produk (SKU)', 'Tambah');
+
+            return $produk;
+        });
+
+        return redirect()->route('admin.produk')
+            ->with('success', "Produk SKU '{$produk->kode_sku}' berhasil ditambahkan.");
+    }
+
+    public function deleteProduk(Produk $produk)
+    {
+        if (
+            $produk->detailForecastRecords()->exists()
+            || $produk->detailPoRecords()->exists()
+            || $produk->sellOutRecords()->exists()
+            || $produk->stokGudangRecords()->exists()
+        ) {
+            return redirect()->back()->with('error', "SKU '{$produk->kode_sku}' sudah digunakan dalam data operasional. Data historis dipertahankan, jadi SKU tidak dapat dihapus.");
+        }
+
+        if (Produk::count() <= 1) {
+            return redirect()->back()->with('error', 'Minimal harus ada 1 master produk SKU di sistem.');
+        }
+
+        $kode = $produk->kode_sku;
+        DB::transaction(function () use ($produk) {
+            $produk->delete();
+            $this->logAction('Master Produk (SKU)', 'Hapus');
+        });
+
+        return redirect()->back()->with('success', "Produk SKU '{$kode}' berhasil dihapus.");
+    }
+
+    // ==================== 4. TAHUN FISKAL ====================
 
     public function tahunFiskal()
     {
-        return view('pages.admin.tahun-fiskal', [
-            'initialFiscalPeriods' => self::getInitialFiscalPeriods(),
-        ]);
+        $fiscalPeriods = TahunFiskal::orderBy('tanggal_mulai', 'desc')->get();
+
+        return view('pages.admin.tahun-fiskal', compact('fiscalPeriods'));
     }
+
+    public function storeTahunFiskal(Request $request)
+    {
+        $nilai = $request->validate([
+            'tahun_mulai' => ['required', 'integer', 'min:2020', 'max:2050'],
+        ], [
+            'tahun_mulai.required' => 'Tahun mulai wajib diisi (contoh: 2028).',
+        ]);
+
+        $tahunMulai = (int) $nilai['tahun_mulai'];
+        $tglMulai = Carbon::create($tahunMulai, 10, 1)->toDateString();
+        $tglSelesai = Carbon::create($tahunMulai + 1, 9, 30)->toDateString();
+
+        $exists = TahunFiskal::where('tanggal_mulai', $tglMulai)->exists();
+        if ($exists) {
+            return redirect()->back()->withInput()->with('error', "Periode tahun fiskal {$tahunMulai}/".($tahunMulai + 1).' sudah ada.');
+        }
+
+        DB::transaction(function () use ($tglMulai, $tglSelesai) {
+            TahunFiskal::create([
+                'tanggal_mulai' => $tglMulai,
+                'tanggal_selesai' => $tglSelesai,
+                'status' => 'Draf',
+            ]);
+
+            $this->logAction('Tahun Fiskal', 'Tambah');
+        });
+
+        return redirect()->route('admin.tahun-fiskal')
+            ->with('success', "Draf periode tahun fiskal {$tahunMulai}/".($tahunMulai + 1).' berhasil dibuat.');
+    }
+
+    public function activateTahunFiskal(TahunFiskal $tahunFiskal)
+    {
+        $label = $tahunFiskal->tanggal_mulai->format('Y').'/'.$tahunFiskal->tanggal_selesai->format('Y');
+        DB::transaction(function () use ($tahunFiskal) {
+            TahunFiskal::where('status', 'Aktif')->update(['status' => 'Selesai']);
+            $tahunFiskal->update(['status' => 'Aktif']);
+            $this->logAction('Tahun Fiskal', 'Ubah');
+        });
+
+        return redirect()->back()
+            ->with('success', "Periode tahun fiskal {$label} sekarang resmi aktif sebagai acuan operasional.");
+    }
+
+    // ==================== 5. LOG AKTIVITAS ====================
 
     public function logAktivitas()
     {
-        return view('pages.admin.log-aktivitas', [
-            'initialLogs' => self::getInitialLogs(),
-        ]);
+        $logs = LogAktivitas::with('pengguna.peran')
+            ->orderBy('waktu', 'desc')
+            ->limit(200)
+            ->get();
+
+        return view('pages.admin.log-aktivitas', compact('logs'));
     }
 }

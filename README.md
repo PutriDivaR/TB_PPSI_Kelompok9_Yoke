@@ -1,121 +1,53 @@
 # Waypoint
 
-Waypoint adalah aplikasi berbasis Laravel untuk pengelolaan data penjualan, distribusi, E-PO, forecast, klaim, monitoring pengiriman, dan pelaporan PT Yoke.
+Waypoint adalah aplikasi berbasis Laravel untuk mendukung proses penjualan dan distribusi PT Yoke. Aplikasi ini menggabungkan pengelolaan master data, perencanaan kebutuhan produk, pemesanan, klaim, monitoring distribusi, serta pelaporan dalam satu sistem.
 
-## Gambaran Sistem
+## Modul dan Peran Pengguna
 
-Repositori ini merupakan prototipe modul operasional dengan simulasi aktor:
+Tabel berikut merangkum modul, pengguna yang terlibat, dan proses yang didukung. Akses ke halaman maupun tindakan di dalam modul mengikuti role pengguna.
 
-| Peran | Fungsionalitas utama |
-| --- | --- |
-| Distributor | Forecast, pengajuan E-PO, katalog SKU, status PO, dan dokumen selesai |
-| Logistik Pusat | Antrean forecast, penetapan kuota, verifikasi E-PO, serta pratinjau PO |
-| SAM | Verifikasi, pengesahan klaim, dan laporan area |
-| Admin | Ringkasan, pengguna, distributor, produk, tahun fiskal, dan log aktivitas |
+| Modul | Pengguna | Fungsi dan alur |
+| --- | --- | --- |
+| Autentikasi dan Profil | Semua pengguna | Pengguna masuk dan keluar melalui autentikasi session. Sistem membatasi akses berdasarkan role dan status akun; pengguna juga dapat memperbarui profil. |
+| Portal Admin | Admin | Melihat ringkasan, mengelola pengguna, distributor, produk, dan tahun fiskal, serta meninjau log aktivitas. |
+| Forecast dan E-PO | Distributor, Logistik Pusat | Distributor menyusun dan mengajukan forecast dalam karton. Logistik Pusat memproses forecast dan menetapkan kuota. Distributor mengajukan E-PO dari forecast yang disetujui, lalu Logistik Pusat memverifikasinya dan menyetujui PO. |
+| Monitoring Pengiriman | Logistik Pusat, Distributor; akses baca juga tersedia bagi role internal | Logistik Pusat membuat dan memperbarui data pengiriman, ETA, serta milestone. Penerimaan barang dapat dicatat oleh Distributor atau Logistik Pusat. Halaman Monitoring tersedia di web; operasi data pengiriman disediakan melalui API. |
+| Klaim | Distributor, SAM, Logistik Pusat | Distributor mengajukan klaim beserta dokumen pendukung. SAM menjadwalkan kunjungan, memverifikasi bukti, dan mengesahkan klaim. Logistik Pusat menindaklanjuti penyelesaian atau pengembalian klaim. |
+| Pelaporan | Distributor, Admin, Logistik Pusat, SAM | Distributor mencatat sell-out dan snapshot stok. Pengguna yang berwenang melihat dashboard, ringkasan, tren dan rekonsiliasi stok, menelusuri riwayat, serta mengekspor laporan CSV. |
+| Data Referensi | Admin; beberapa referensi dapat dibaca role lain sesuai izin | Menyediakan data pendukung seperti produk, distributor, role, wilayah, dan tahun fiskal untuk digunakan modul-modul aplikasi. |
 
-Autentikasi produksi belum diterapkan. Pemilihan aktor pada prototipe menggunakan session simulasi dan dibatasi ke lingkungan lokal/tes pada modul yang masih memakai middleware simulasi.
+## Alur Kerja Aplikasi
 
-## Modul E-PO dan Forecast
+### Perencanaan hingga penerimaan barang
 
-### Alur bisnis
+1. **Distributor mengajukan forecast** kebutuhan produk untuk periode perencanaan. Jumlah forecast menggunakan satuan karton.
+2. **Logistik Pusat memproses forecast** dan menetapkan jumlah yang disetujui per produk sebagai kuota.
+3. **Distributor membuat E-PO** berdasarkan forecast yang telah disetujui dan kuota yang masih tersedia.
+4. **Logistik Pusat memverifikasi dan menyetujui E-PO.** Pesanan yang disetujui menjadi PO untuk proses pengiriman.
+5. **Logistik Pusat mengelola pengiriman** yang terkait PO, termasuk informasi ETA dan milestone perjalanan.
+6. **Distributor atau Logistik Pusat mencatat penerimaan** barang sebagai bagian dari monitoring pengiriman.
 
-1. **Distributor membuat Forecast**
-   - Sistem menampilkan seluruh SKU aktif beserta rekomendasi histori penjualan.
-   - Forecast ditujukan sebagai **target kedatangan stok**, bukan sekadar kebutuhan bulan berjalan.
-   - Periode digunakan untuk horizon perencanaan 5 bulan ke depan.
-   - Untuk setiap bulan target, distributor mengisi jumlah usulan dalam karton; SKU yang tidak dibutuhkan bernilai 0.
+### Penanganan klaim
 
-2. **Logistik menetapkan kuota**
-   - Forecast berstatus Diajukan masuk antrean Logistik.
-   - Logistik dapat menyetujui seluruh usulan sekaligus.
-   - Jika kuota dikurangi, Logistik mengisi catatan penyesuaian.
-   - Kuota per SKU disimpan pada `detail_forecast.jumlah_disetujui`.
+1. Distributor mengajukan klaim dan melampirkan dokumen atau bukti pendukung.
+2. SAM menjadwalkan kunjungan, memeriksa bukti, lalu memverifikasi klaim. Klaim dapat dikembalikan untuk tindak lanjut bila diperlukan.
+3. SAM mengesahkan klaim yang lolos verifikasi.
+4. Logistik Pusat menindaklanjuti penyelesaian klaim atau mengembalikannya sesuai hasil proses.
 
-3. **Distributor mengajukan E-PO**
-   - Hanya Forecast berstatus Disetujui dan masih memiliki sisa kuota yang dapat dipakai.
-   - Distributor mencari SKU, menambahnya ke daftar pesanan, dan mengubah jumlah karton.
-   - Katalog menampilkan kode SKU, nama, kategori, harga, kuota, dan sisa kuota.
-   - Minimum pesanan adalah 2.000 karton atau 1 kontainer.
-   - Pengajuan diblokir jika jumlah melebihi sisa kuota atau total kurang dari minimum order.
+### Pencatatan dan pelaporan
 
-4. **Logistik memverifikasi E-PO**
-   - Sistem memeriksa minimum order, produk pada Forecast, sisa kuota, status Forecast, serta identitas distributor.
-   - Setelah lolos, Logistik menyetujui E-PO.
-   - E-PO berubah menjadi PO resmi dan dapat dicetak atau disimpan sebagai PDF melalui fungsi cetak browser.
+Distributor mencatat transaksi sell-out dan snapshot stok. Data tersebut digunakan dalam dashboard dan ringkasan, analisis tren, rekonsiliasi stok, riwayat per periode, serta ekspor CSV. Rekomendasi forecast juga menggunakan data penjualan dan stok.
 
-5. **Riwayat dan status**
-   - Distributor dapat melihat riwayat Forecast dan riwayat E-PO pada dashboard.
-   - Forecast lama hanya ditampilkan sebagai riwayat dan tidak dapat diubah.
-   - E-PO lama tidak dapat dihapus setelah diproses atau disetujui.
-
-### Lead time dan cutoff
-
-- Sistem memakai cutoff pengajuan tanggal 15 setiap bulan.
-- Forecast dapat direncanakan hingga 5 bulan ke depan.
-- Estimasi awal pengiriman memakai lead time 60–75 hari.
-- Setelah data pengiriman dibuat pada modul Monitoring, estimasi awal dapat digantikan oleh `eta_awal` dan `eta_terkini` yang dikelola modul pengiriman.
-- Informasi gelombang, cutoff, dan ETA ditampilkan pada:
-  - Formulir Input E-PO distributor
-  - Verifikasi E-PO logistik
-  - Dokumen PO distributor
-
-Catatan: tanggal cutoff, horizon Forecast, minimum order, dan estimasi lead time saat ini berupa konstanta Controller untuk memudahkan penyesuaian. Belum ada kolom konfigurasi tambahan pada database.
-
-### Struktur tabel E-PO
-
-| Tabel | Fungsi |
-| --- | --- |
-| `forecast` | Induk Forecast dan target periode |
-| `detail_forecast` | Usulan dan kuota per produk |
-| `purchase_order` | Induk E-PO/PO |
-| `detail_po` | Baris produk pada E-PO/PO |
-| `pengiriman` | Nomor kontainer, vessel, dan ETA aktual |
-| `detail_pengiriman` | Kuantitas produk yang dikirim |
-| `penerimaan_barang` | Pencatatan kedatangan |
-| `detail_penerimaan` | Kuantitas diterima dan kondisi barang |
-
-E-PO tidak menambah kolom cutoff atau ETA pada tabel. Nilai tersebut dihitung dari tanggal pengajuan dan data pengiriman yang sudah tersedia.
-
-## Struktur Direktori
-
-```text
-app/
-  Http/Controllers/
-    EPO/                 Controller Forecast dan E-PO
-    Klaim/               Controller modul klaim
-    Api/V1/              API Forecast, PO, Shipment, laporan, dan autentikasi
-  Models/                Model Eloquent sesuai ERD
-  Services/              Logika rekomendasi dan layanan pelaporan
-
-resources/views/
-  layouts/               Layout, header, sidebar, dan notifikasi
-  pages/
-    e-po/                Tampilan Distributor dan Logistik
-    klaim/
-    pelaporan/
-    admin/
-
-routes/
-  web.php                Rute simulasi dan halaman web
-  api.php                Rute API
-
-database/
-  schema/                ERD SQL dan metadata skema
-  factories/             Factory pengujian
-
-tests/
-  Feature/               Pengujian fitur HTTP dan database
-```
-
-## Persyaratan
+## Teknologi
 
 - PHP 8.3 atau lebih baru
-- Composer
-- Node.js dan npm
-- MySQL 8.4 atau kompatibel
 - Laravel 13
+- MySQL 8.4 atau kompatibel
+- Node.js dan npm untuk aset frontend (Vite dan Tailwind CSS)
 
-## Instalasi
+## Instalasi Lokal
+
+Pastikan PHP, Composer, Node.js, npm, dan MySQL tersedia. Jalankan dari root proyek:
 
 ```powershell
 composer install
@@ -125,55 +57,83 @@ npm install
 npm run build
 ```
 
-Buat database MySQL kosong, misalnya `yoke_ppsi`, lalu sesuaikan `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` pada `.env`.
+Buat database MySQL kosong, misalnya `yoke_ppsi`, lalu sesuaikan `DB_DATABASE`, `DB_USERNAME`, dan `DB_PASSWORD` di `.env`. Pasang skema database dan jalankan aplikasi:
 
 ```powershell
 php artisan yoke:database-install
 php artisan serve --host=127.0.0.1 --port=8001
 ```
 
-Perintah installer membuat dan memeriksa skema ERD tanpa menghapus data pada database yang sudah berisi tabel.
+Installer memeriksa dan memasang skema ERD tanpa menghapus data dari database yang sudah berisi tabel. Jangan gunakan `migrate:fresh` pada database yang berisi data.
 
-## Alamat Modul
+## Halaman Aplikasi
 
-- Dashboard Distributor: `http://127.0.0.1:8001/distributor`
-- Antrean Logistik: `http://127.0.0.1:8001/logistik`
-- Modul Pelaporan: `http://127.0.0.1:8001/pelaporan`
-- Portal Admin: `http://127.0.0.1:8001/simulasi/admin`
-- Status Database: `http://127.0.0.1:8001/integrasi-database/status`
+Setelah aplikasi berjalan, buka halaman login lalu masuk menggunakan akun yang tersedia di database:
 
-## Route Utama E-PO
+| Halaman | URL lokal |
+| --- | --- |
+| Login | `http://127.0.0.1:8001/login` |
+| Admin | `http://127.0.0.1:8001/admin/ringkasan` |
+| Forecast distributor | `http://127.0.0.1:8001/e-po/distributor/hitung-forecast` |
+| Antrean E-PO Logistik | `http://127.0.0.1:8001/e-po/logistik/antrean` |
+| Klaim distributor | `http://127.0.0.1:8001/klaim/distributor/beranda` |
+| Antrean klaim SAM | `http://127.0.0.1:8001/klaim/sam/antrean` |
+| Proses klaim Logistik | `http://127.0.0.1:8001/klaim/logistik/proses` |
+| Monitoring pengiriman | `http://127.0.0.1:8001/monitoring` |
+| Pelaporan | `http://127.0.0.1:8001/pelaporan` |
+| Status database | `http://127.0.0.1:8001/integrasi-database/status` |
+
+Halaman dan tindakan tertentu hanya tersedia untuk role yang berwenang.
+
+## API
+
+API versi 1 berada di bawah prefix `/api/v1` dan memakai session serta CSRF pada origin aplikasi yang sama. Endpoint terproteksi memerlukan autentikasi dan sebagian endpoint membatasi akses berdasarkan role.
+
+| Kelompok endpoint | Cakupan |
+| --- | --- |
+| `/api/v1/auth` | CSRF, login, informasi sesi, dan logout |
+| `/api/v1/reference` dan `/api/v1/admin` | Data referensi dan administrasi |
+| `/api/v1/forecasts` dan `/api/v1/purchase-orders` | Forecast dan E-PO |
+| `/api/v1/shipments` | Pengiriman, milestone, dan penerimaan |
+| `/api/v1/claims` | Pengajuan dan pemrosesan klaim |
+| `/api/v1/reports` | Dashboard, ringkasan, riwayat, dan ekspor laporan |
+
+## Struktur Proyek
 
 ```text
-GET    /e-po/distributor/hitung-forecast
-GET    /e-po/distributor/ajukan-forecast
-POST   /e-po/distributor/ajukan-forecast
-GET    /e-po/distributor/input-epo
-POST   /e-po/distributor/input-epo
-GET    /e-po/distributor/epo-selesai/{po?}
-
-GET    /e-po/logistik/antrean
-GET    /e-po/logistik/forecast/{forecast}
-POST   /e-po/logistik/forecast/{forecast}/tetapkan
-GET    /e-po/logistik/epo/{po}/verifikasi
-POST   /e-po/logistik/epo/{po}/setujui
+app/
+  Http/Controllers/       Controller web dan API
+  Http/Middleware/        Autentikasi dan pemeriksaan role/status pengguna
+  Models/                 Model Eloquent
+  Services/               Layanan domain dan pelaporan
+resources/views/          Layout dan halaman modul
+routes/
+  web.php                 Route halaman web
+  api.php                 Route API versi 1
+database/
+  schema/                 Skema ERD dan metadata pemeriksaan database
+  factories/              Factory pengujian
+tests/
+  Feature/                Pengujian fitur aplikasi
 ```
 
-Perpindahan antarperan menggunakan route Laravel, bukan parameter query `?role=...`.
-
-## Pengujian
+## Pengujian dan Build
 
 ```powershell
 php artisan test --compact
 npm run build
 ```
 
-Pengujian fitur menggunakan SQLite in-memory. Seluruh perubahan database pada pengujian memakai data terisolasi dan tidak menimpa database MySQL utama.
+Pengujian fitur menggunakan database terisolasi. Untuk memeriksa skema database lokal:
 
-## Catatan Pengembangan
+```powershell
+php artisan yoke:database-check
+```
 
-- Jangan menjalankan `migrate:fresh` pada database yang berisi data produksi atau simulasi.
-- Gunakan `php artisan yoke:database-check` untuk memeriksa kesesuaian ERD.
-- Pertahankan satuan karton pada modul Forecast dan E-PO meskipun nama kolom lama menggunakan `jumlah_kontainer`.
-- Satu distributor hanya boleh memiliki satu Forecast aktif untuk kombinasi distributor dan periode.
-- Hak akses produksi perlu ditambahkan sebelum aplikasi dipakai secara operasional.
+## Catatan Domain
+
+- Forecast dan E-PO menggunakan satuan **karton**; nama field lama `jumlah_kontainer` pada payload API tertentu juga menyatakan jumlah karton.
+- Forecast unik untuk kombinasi distributor dan periode, dan detailnya unik untuk setiap produk.
+- Draft E-PO tidak mengurangi kuota sampai statusnya diajukan atau diproses sesuai alur.
+- Perubahan yang melibatkan beberapa tabel harus menjaga konsistensi transaksi database.
+- Sebelum penggunaan operasional, tinjau konfigurasi deployment, akun, dan kebijakan akses produksi.

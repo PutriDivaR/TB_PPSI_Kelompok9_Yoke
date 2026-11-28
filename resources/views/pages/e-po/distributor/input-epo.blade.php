@@ -15,15 +15,6 @@
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-4">
-            <form method="POST" action="{{ route('e-po.distributor.konteks') }}" class="flex items-center gap-2">
-                @csrf
-                <label for="ctx-distributor" class="text-[10px] font-bold uppercase text-slate-400">Perusahaan simulasi</label>
-                <select id="ctx-distributor" name="id_distributor" onchange="this.form.submit()" class="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white">
-                    @foreach ($daftarDistributor as $d)
-                        <option value="{{ $d->id_distributor }}" @selected($d->id_distributor === $distributor->id_distributor)>{{ $d->nama }}</option>
-                    @endforeach
-                </select>
-            </form>
             @php $langkah = ['Usulan Forecast', 'Input E-PO', 'Dokumen PO Selesai']; $aktif = 2; @endphp
             <ol class="flex items-center gap-2 text-xs">
                 @foreach ($langkah as $i => $label)
@@ -56,7 +47,7 @@
             <form method="GET" action="{{ route('e-po.distributor.input-epo') }}" class="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div>
                     <label for="forecast-epo" class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Periode Forecast untuk E-PO</label>
-                    <p class="mt-1 text-[11px] text-slate-500">E-PO dapat dibuat untuk forecast bulan berjalan atau bulan depan selama kuota masih tersedia.</p>
+                    <p class="mt-1 text-[11px] text-slate-500">E-PO dapat dibuat untuk target kedatangan dalam window lead time 2-3 bulan selama kuota masih tersedia.</p>
                 </div>
                 <select id="forecast-epo" name="forecast" onchange="this.form.submit()" class="min-w-60 rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     @foreach ($daftarForecastEpo as $forecastPilihan)
