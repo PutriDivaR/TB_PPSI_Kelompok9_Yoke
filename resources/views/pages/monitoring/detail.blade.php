@@ -289,21 +289,21 @@
                 </span>
             </div>
 
-            <div class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            <div class="relative space-y-6 before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
                 @forelse($shipment->milestonePengirimanRecords as $milestone)
-                <div class="relative group">
-                    <span class="absolute -left-6 top-1 w-5 h-5 rounded-full bg-red-600 border-2 border-white shadow flex items-center justify-center text-white text-[10px] font-black">
+                <div class="relative flex items-start gap-4 group">
+                    <span class="relative z-10 w-7 h-7 rounded-full bg-red-600 border-2 border-white shadow-sm flex items-center justify-center text-white text-xs font-black shrink-0">
                         {{ $milestone->urutan }}
                     </span>
-                    <div class="ml-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-black text-slate-900">{{ $milestone->nama_tahap }}</span>
-                            <span class="text-[10px] font-bold text-slate-400">
-                                {{ \Carbon\Carbon::parse($milestone->tanggal_pembaruan)->translatedFormat('d M Y &middot; H:i') }} WIB
+                    <div class="min-w-0 flex-1 pt-0.5">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                            <span class="text-sm font-black text-slate-900 tracking-tight">{{ $milestone->nama_tahap }}</span>
+                            <span class="text-[11px] font-semibold text-slate-500 shrink-0">
+                                {{ \Carbon\Carbon::parse($milestone->tanggal_pembaruan)->translatedFormat('d M Y') }} &middot; {{ \Carbon\Carbon::parse($milestone->tanggal_pembaruan)->format('H:i') }} WIB
                             </span>
                         </div>
                         @if($milestone->keterangan)
-                            <p class="text-xs text-slate-600 mt-1 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+                            <p class="text-xs text-slate-600 mt-2 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-200/60">
                                 {{ $milestone->keterangan }}
                             </p>
                         @endif

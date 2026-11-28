@@ -5,23 +5,37 @@
 @section('module_title', 'Modul Monitoring Pengiriman')
 
 @section('content')
-<div class="space-y-6">
+<div class="space-y-6" x-data="{ showInputModal: false, etaAwal: '{{ date('Y-m-d', strtotime('+3 days')) }}', etaTerkini: '{{ date('Y-m-d', strtotime('+3 days')) }}' }">
 
     @include('layouts.partials.flash')
 
     <!-- TOP HEADER / CONTEXT BAR -->
     <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-4 lg:p-5 flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center space-x-4">
-            <div class="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-700 border border-slate-200">
+            <div class="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center text-slate-700 border border-red-100">
                 <i class="fa-solid fa-truck-moving text-xl text-red-600"></i>
             </div>
             <div>
                 <div class="flex items-center space-x-2">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Distributor Regional</span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">DST-PDG-014</span>
+                    @if($currentRole === 'logistik')
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-red-600">Logistik Pusat</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">LOG-PST-001</span>
+                    @elseif($currentRole === 'sam')
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600">Senior Area Manager</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">SAM-SBR-01</span>
+                    @else
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Distributor Regional</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">DST-PDG-014</span>
+                    @endif
                 </div>
                 <h1 class="text-base lg:text-lg font-extrabold text-slate-900">
-                    PT Minang Niaga Jaya (Cabang Padang)
+                    @if($currentRole === 'logistik')
+                        Operasional & Distribusi Logistik Nasional
+                    @elseif($currentRole === 'sam')
+                        Monitoring Pengiriman Wilayah Sumatera Barat
+                    @else
+                        PT Minang Niaga Jaya (Cabang Padang)
+                    @endif
                 </h1>
             </div>
         </div>
@@ -107,9 +121,18 @@
                 <h3 class="text-base font-bold text-slate-900">Daftar Kontainer Aktif</h3>
                 <p class="text-xs text-slate-500">Kontainer yang sedang bergerak, menunggu muat, atau memerlukan perhatian</p>
             </div>
-            <span class="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">
-                {{ $shipments->count() }} Kontainer Prioritas
-            </span>
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
+                    {{ $shipments->count() }} Kontainer Prioritas
+                </span>
+                @if($currentRole === 'logistik')
+                    <button type="button" @click="showInputModal = true" 
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-sm transition transform hover:-translate-y-0.5">
+                        <i class="fa-solid fa-plus-circle text-sm"></i>
+                        <span>Input Pengiriman Baru</span>
+                    </button>
+                @endif
+            </div>
         </div>
 
         <!-- Filter Bar -->
@@ -367,5 +390,130 @@
         </div>
     </div>
 
+    <!-- MODAL INPUT PENGIRIMAN BARU (KHUSUS LOGISTIK PUSAT) -->
+    @if($currentRole === 'logistik')
+    <div x-show="showInputModal" 
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+         style="display: none;">
+        
+        <div @click.away="showInputModal = false" 
+             x-show="showInputModal"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden my-8">
+            
+            <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold">
+                        <i class="fa-solid fa-ship text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900">Input Pengiriman Kontainer Baru</h3>
+                        <p class="text-xs text-slate-500">Daftarkan nomor kontainer, armada kapal, dan jadwal ETA pengiriman</p>
+                    </div>
+                </div>
+                <button type="button" @click="showInputModal = false" class="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-lg flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form method="POST" action="{{ route('monitoring.store') }}" class="p-6 space-y-4">
+                @csrf
+
+                <!-- Pilih E-PO -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                        Pilih Purchase Order (E-PO) Terverifikasi <span class="text-red-500">*</span>
+                    </label>
+                    <select name="id_po" required class="w-full text-xs rounded-xl border-slate-300 py-2.5 px-3 focus:ring-red-500 focus:border-red-500 font-medium">
+                        <option value="">-- Pilih Nomor E-PO --</option>
+                        @foreach($purchaseOrders as $po)
+                            <option value="{{ $po->id_po }}">
+                                {{ $po->nomor_po }} &middot; {{ $po->forecast?->distributor?->nama ?? 'Distributor' }} ({{ $po->status }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Nomor Kontainer & Nama Vessel -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                            Nomor Kontainer <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="nomor_kontainer" required placeholder="Contoh: CNTR-2026-025" 
+                               class="w-full text-xs rounded-xl border-slate-300 py-2.5 px-3 focus:ring-red-500 focus:border-red-500 font-medium uppercase font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                            Armada / Feeder Vessel
+                        </label>
+                        <input type="text" name="nama_vessel" placeholder="Contoh: MV Meratus Sabang V.14" 
+                               class="w-full text-xs rounded-xl border-slate-300 py-2.5 px-3 focus:ring-red-500 focus:border-red-500 font-medium">
+                    </div>
+                </div>
+
+                <!-- ETA Awal & ETA Terkini -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                            Estimasi Tiba (ETA Awal) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="date" name="eta_awal" x-model="etaAwal" @change="etaTerkini = etaAwal" required 
+                               class="w-full text-xs rounded-xl border-slate-300 py-2.5 px-3 focus:ring-red-500 focus:border-red-500 font-medium">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                            ETA Terkini (Revisi)
+                        </label>
+                        <input type="date" name="eta_terkini" x-model="etaTerkini" 
+                               class="w-full text-xs rounded-xl border-slate-300 py-2.5 px-3 focus:ring-red-500 focus:border-red-500 font-medium">
+                    </div>
+                </div>
+
+                <!-- Status Awal -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                        Status Awal Pengiriman <span class="text-red-500">*</span>
+                    </label>
+                    <select name="status" required class="w-full text-xs rounded-xl border-slate-300 py-2.5 px-3 focus:ring-red-500 focus:border-red-500 font-medium">
+                        <option value="Menunggu Muat">Menunggu Muat (Stuffing Pabrik & Dokumen Booking)</option>
+                        <option value="Dalam Perjalanan">Dalam Perjalanan (Pelayaran Aktif)</option>
+                    </select>
+                </div>
+
+                <!-- Catatan / Keterangan Milestone 1 -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                        Catatan Milestone 1 (Booking Dikonfirmasi)
+                    </label>
+                    <textarea name="keterangan" rows="2" placeholder="Catatan jadwal muat, kapal, atau kondisi stuffing..." 
+                              class="w-full text-xs rounded-xl border-slate-300 p-3 focus:ring-red-500 focus:border-red-500 font-medium"></textarea>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                    <button type="button" @click="showInputModal = false" class="px-4 py-2.5 border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg transition">
+                        Batal
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition shadow-sm flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                        <span>Simpan & Daftarkan Kontainer</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endif
 </div>
 @endsection

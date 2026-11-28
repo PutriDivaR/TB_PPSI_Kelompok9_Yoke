@@ -22,7 +22,37 @@ class MonitoringPengirimanTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Monitoring Pengiriman')
-            ->assertSee('Update Status Kontainer');
+            ->assertSee('Update Status Kontainer')
+            ->assertSee('Input Pengiriman Baru')
+            ->assertSee('Input Pengiriman Kontainer Baru');
+    }
+
+    public function test_logistik_can_store_new_shipment(): void
+    {
+        $uniqueContainer = 'CNTR-TEST-'.uniqid();
+
+        $response = $this->post('/monitoring/store', [
+            'id_po' => 1,
+            'nomor_kontainer' => $uniqueContainer,
+            'nama_vessel' => 'MV Test Vessel V.1',
+            'eta_awal' => '2026-12-05',
+            'eta_terkini' => '2026-12-05',
+            'status' => 'Menunggu Muat',
+            'keterangan' => 'Test pendaftaran pengiriman baru',
+        ]);
+
+        $response->assertRedirect('/monitoring?role=logistik');
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('pengiriman', [
+            'nomor_kontainer' => $uniqueContainer,
+            'status' => 'Menunggu Muat',
+        ]);
+
+        $this->assertDatabaseHas('milestone_pengiriman', [
+            'nama_tahap' => 'Booking Dikonfirmasi',
+            'urutan' => 1,
+        ]);
     }
 
     public function test_monitoring_dashboard_renders_for_sam(): void

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Monitoring;
 
 use App\Http\Controllers\Controller;
+use App\Models\DetailPengiriman;
 use App\Models\Distributor;
 use App\Models\MilestonePengiriman;
 use App\Models\Pengiriman;
+use App\Models\PurchaseOrder;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Contracts\View\View;
@@ -102,9 +104,12 @@ class MonitoringPengirimanController extends Controller implements HasMiddleware
             return $s->status === 'Terlambat' || Carbon::parse($s->eta_terkini)->gt(Carbon::parse($s->eta_awal));
         });
 
+        $purchaseOrders = PurchaseOrder::with(['forecast.distributor'])->orderByDesc('id_po')->get();
+
         return view('pages.monitoring.index', [
             'currentRole' => $currentRole,
             'shipments' => $shipments,
+            'purchaseOrders' => $purchaseOrders,
             'distributorList' => $distributorList,
             'filterDistributor' => $filterDistributor,
             'filterStatus' => $filterStatus,
@@ -120,6 +125,62 @@ class MonitoringPengirimanController extends Controller implements HasMiddleware
             ],
             'delayedContainers' => $delayedContainers,
         ]);
+    }
+
+    /**
+     * Simpan Pengiriman Kontainer Baru (Khusus Logistik Pusat)
+     * Mengisi tabel pengiriman dan membuat milestone 1 (Booking Dikonfirmasi)
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'id_po' => 'required|exists:purchase_order,id_po',
+            'nomor_kontainer' => 'required|string|max:60|unique:pengiriman,nomor_kontainer',
+            'nama_vessel' => 'nullable|string|max:150',
+            'eta_awal' => 'required|date',
+            'eta_terkini' => 'nullable|date',
+            'status' => 'required|string|max:40',
+            'keterangan' => 'nullable|string|max:255',
+        ]);
+
+        $shipment = DB::transaction(function () use ($request) {
+            $etaTerkini = $request->input('eta_terkini') ?: $request->input('eta_awal');
+
+            $shipment = Pengiriman::create([
+                'id_po' => $request->input('id_po'),
+                'nomor_kontainer' => trim($request->input('nomor_kontainer')),
+                'nama_vessel' => $request->input('nama_vessel'),
+                'eta_awal' => $request->input('eta_awal'),
+                'eta_terkini' => $etaTerkini,
+                'status' => $request->input('status', 'Menunggu Muat'),
+            ]);
+
+            // Milestone awal: Booking Dikonfirmasi
+            MilestonePengiriman::create([
+                'id_pengiriman' => $shipment->id_pengiriman,
+                'urutan' => 1,
+                'nama_tahap' => 'Booking Dikonfirmasi',
+                'tanggal_pembaruan' => now(),
+                'keterangan' => $request->input('keterangan') ?: 'Jadwal dan nomor kontainer telah didaftarkan oleh Logistik Pusat.',
+            ]);
+
+            // Sinkronisasi muatan dari Detail PO jika tersedia
+            $po = PurchaseOrder::with('detailPoRecordsAsPo')->find($request->input('id_po'));
+            if ($po && $po->detailPoRecordsAsPo->isNotEmpty()) {
+                foreach ($po->detailPoRecordsAsPo as $detailPo) {
+                    DetailPengiriman::create([
+                        'id_pengiriman' => $shipment->id_pengiriman,
+                        'id_detail_po' => $detailPo->id_detail_po,
+                        'jumlah_dikirim' => $detailPo->jumlah_kontainer > 0 ? $detailPo->jumlah_kontainer : 1,
+                    ]);
+                }
+            }
+
+            return $shipment;
+        });
+
+        return redirect()->route('monitoring.index', ['role' => 'logistik'])
+            ->with('success', "Pengiriman kontainer {$shipment->nomor_kontainer} berhasil didaftarkan.");
     }
 
     /**

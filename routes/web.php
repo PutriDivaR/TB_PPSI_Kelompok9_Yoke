@@ -84,6 +84,7 @@ Route::prefix('e-po')->name('e-po.')->group(function () {
 // Modul Monitoring Pengiriman (PJ: Riski)
 Route::prefix('monitoring')->name('monitoring.')->controller(MonitoringPengirimanController::class)->group(function () {
     Route::get('/', 'index')->name('index');
+    Route::post('/store', 'store')->name('store');
     Route::get('/detail/{id}', 'detail')->name('detail');
     Route::get('/update/{id}', 'updateStatus')->name('update');
     Route::post('/milestone/{id}', 'storeMilestone')->name('milestone.store');
